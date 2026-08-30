@@ -189,7 +189,7 @@
     }
     const p = item.pal;
     const bg = ctx.createRadialGradient(W / 2, H * 0.42, 2, W / 2, H * 0.5, H);
-    bg.addColorStop(0, U.rgba(p.g, 0.20)); bg.addColorStop(1, 'rgba(0,0,0,0)');
+    bg.addColorStop(0, U.rgba(p.g, 0.13)); bg.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
     const h = 78;
@@ -200,7 +200,9 @@
     ctx.save();
     switch (item.slot) {
       case 'head': case 'face': {
-        ctx.translate(W / 2 - 2, H * 0.86); ctx.scale(1.9, 1.9); ctx.translate(0, h * 0.86);
+        /* park the head at 60% height — the shift below is in scaled space, so it
+           cancels the skull's local offset and the anchor alone decides framing */
+        ctx.translate(W / 2 - 2, H * 0.60); ctx.scale(2.2, 2.2); ctx.translate(0, h * 0.855);
         ghostHead(ctx, sk);
         (item.slot === 'head' ? SB.COS_DRAW.head : SB.COS_DRAW.face)(ctx, item, sk, e);
         break;
