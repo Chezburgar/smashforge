@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SMASHFORGE — Platform Fighter &amp; Character Forge</title>
+<meta name="description" content="A browser platform fighter with a full character forge: 585 moves, 1220 cosmetics, four stages.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="stage-wrap"><canvas id="game"></canvas></div>
+
+<div id="ui">
+
+  <!-- ============ TITLE ============ -->
+  <div class="screen on fade" id="sc-title">
+    <div class="bgfx"></div>
+    <div class="wrap">
+      <div class="title-center">
+        <div class="title-inner">
+          <div>
+            <div class="sub">Anvil &amp; Arena presents</div>
+            <h1 class="title-big">SMASHFORGE</h1>
+            <div class="sub" style="margin-top:8px">Forge a fighter. Break the stage.</div>
+          </div>
+          <div class="menu-list" id="title-menu"></div>
+          <div class="stat-strip" id="title-stats"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ MODE ============ -->
+  <div class="screen" id="sc-mode">
+    <div class="bgfx"></div>
+    <div class="wrap">
+      <div class="hdr">
+        <div class="brand">SMASH<span>FORGE</span> · MODE</div>
+        <button class="btn sm ghost" data-back>← Back</button>
+      </div>
+      <div class="dz-main"><div class="grid cards" id="mode-grid" style="max-width:1160px;margin:0 auto"></div></div>
+    </div>
+  </div>
+
+  <!-- ============ ROSTER ============ -->
+  <div class="screen" id="sc-roster">
+    <div class="bgfx"></div>
+    <div class="wrap">
+      <div class="hdr">
+        <div class="brand">SMASH<span>FORGE</span> · <span id="roster-title" style="color:var(--txt2)">SELECT FIGHTER</span></div>
+        <div class="row">
+          <button class="btn sm" id="roster-new">+ New Fighter</button>
+          <button class="btn sm" id="roster-random">Random</button>
+          <button class="btn sm ghost" data-back>← Back</button>
+        </div>
+      </div>
+      <div class="dz-main"><div class="grid cards" id="roster-grid" style="max-width:1280px;margin:0 auto"></div></div>
+      <div class="footer">
+        <div class="muted small" id="roster-hint">Pick a fighter, or forge a new one.</div>
+        <div class="row">
+          <button class="btn sm warn" id="roster-del">Delete</button>
+          <button class="btn sm" id="roster-edit">Edit in Forge</button>
+          <button class="btn primary" id="roster-go">Confirm →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ DESIGNER ============ -->
+  <div class="screen" id="sc-designer">
+    <div class="bgfx"></div>
+    <div class="wrap">
+      <div class="hdr">
+        <div class="brand">THE <span>FORGE</span></div>
+        <div class="row">
+          <button class="btn sm" id="dz-randomize">🎲 Randomize</button>
+          <button class="btn sm" id="dz-reset-kit">Reset Kit</button>
+          <button class="btn sm ghost" id="dz-cancel">Discard</button>
+          <button class="btn primary sm" id="dz-save">Save Fighter</button>
+        </div>
+      </div>
+      <div class="dz">
+        <div class="dz-nav" id="dz-nav"></div>
+        <div class="dz-main" id="dz-main"></div>
+        <div class="dz-side">
+          <canvas class="prev-canvas" id="dz-prev"></canvas>
+          <div class="prev-body" id="dz-info"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ STAGE SELECT ============ -->
+  <div class="screen" id="sc-stage">
+    <div class="bgfx"></div>
+    <div class="wrap">
+      <div class="hdr">
+        <div class="brand">SMASH<span>FORGE</span> · STAGE</div>
+        <button class="btn sm ghost" data-back>← Back</button>
+      </div>
+      <div class="dz-main"><div class="grid cards" id="stage-grid" style="max-width:1160px;margin:0 auto"></div></div>
+      <div class="footer">
+        <div class="row" id="stage-opts"></div>
+        <button class="btn primary" id="stage-go">Fight →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ RESULTS ============ -->
+  <div class="screen" id="sc-results">
+    <div class="bgfx"></div>
+    <div class="wrap">
+      <div class="title-center">
+        <div class="panel pad" style="width:min(820px,92vw)">
+          <h2 id="res-title" style="font-size:34px;letter-spacing:.14em;margin-bottom:4px">GAME</h2>
+          <div class="muted small" id="res-sub" style="margin-bottom:16px"></div>
+          <table class="res-table"><thead><tr>
+            <th>Fighter</th><th>KOs</th><th>Falls</th><th>Damage Dealt</th><th>Taken</th><th>Biggest Hit</th>
+          </tr></thead><tbody id="res-rows"></tbody></table>
+          <div class="row" style="margin-top:20px;justify-content:flex-end">
+            <button class="btn" id="res-menu">Main Menu</button>
+            <button class="btn primary" id="res-again">Rematch</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ CONTROLS ============ -->
+  <div class="screen" id="sc-controls">
+    <div class="bgfx"></div>
+    <div class="wrap">
+      <div class="hdr">
+        <div class="brand">SMASH<span>FORGE</span> · CONTROLS</div>
+        <button class="btn sm ghost" data-back>← Back</button>
+      </div>
+      <div class="dz-main"><div id="controls-body" style="max-width:980px;margin:0 auto"></div></div>
+    </div>
+  </div>
+
+  <!-- ============ OPTIONS ============ -->
+  <div class="screen" id="sc-options">
+    <div class="bgfx"></div>
+    <div class="wrap">
+      <div class="hdr">
+        <div class="brand">SMASH<span>FORGE</span> · OPTIONS</div>
+        <button class="btn sm ghost" data-back>← Back</button>
+      </div>
+      <div class="dz-main"><div id="options-body" style="max-width:720px;margin:0 auto"></div></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script src="js/util.js"></script>
+<script src="js/input.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/data/archetypes.js"></script>
+<script src="js/data/moves.js"></script>
+<script src="js/data/cosmetics.js"></script>
+<script src="js/data/stages.js"></script>
+<script src="js/render/prims.js"></script>
+<script src="js/render/skeleton.js"></script>
+<script src="js/render/weapons.js"></script>
+<script src="js/render/cosmetic.js"></script>
+<script src="js/render/vfx.js"></script>
+<script src="js/render/fighterdraw.js"></script>
+<script src="js/render/stagedraw.js"></script>
+<script src="js/game/build.js"></script>
+<script src="js/game/fighter.js"></script>
+<script src="js/game/combat.js"></script>
+<script src="js/game/ai.js"></script>
+<script src="js/ui/hud.js"></script>
+<script src="js/game/match.js"></script>
+<script src="js/ui/preview.js"></script>
+<script src="js/ui/screens.js"></script>
+<script src="js/ui/designer.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
