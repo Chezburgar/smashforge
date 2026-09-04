@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orion Client — Eaglercraft 1.8 in your browser</title>
+<meta name="description" content="Orion Client: a browser launcher for Eaglercraft 1.8 with a built-in server book for joining and hosting EaglerXServer servers.">
+<link rel="icon" href="assets/orion-logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/orion.css">
+</head>
+<body>
+
+<div id="sky"></div>
+<canvas id="stars"></canvas>
+
+<!-- The game takes over these two layers once it boots. -->
+<div id="boot">
+  <div class="inner">
+    <img src="assets/orion-logo.svg" alt="">
+    <div class="msg" id="boot-msg">Starting Orion</div>
+    <div class="sub" id="boot-sub"></div>
+  </div>
+</div>
+<div id="game-shell">
+  <div id="game_frame"></div>
+</div>
+<button class="btn slim" id="game-exit" style="display:none">Exit to launcher</button>
+
+<div id="shell">
+
+  <header class="top">
+    <a class="brand" href="./">
+      <img src="assets/orion-logo.svg" alt="Orion Client logo">
+      <div>
+        <h1>Orion<span>&nbsp;Client</span></h1>
+        <div class="tag">Eaglercraft 1.8 · Browser</div>
+      </div>
+    </a>
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button role="tab" data-view="play"    aria-selected="true">Play</button>
+      <button role="tab" data-view="servers" aria-selected="false">Servers</button>
+      <button role="tab" data-view="host"    aria-selected="false">Host a server</button>
+      <button role="tab" data-view="setup"   aria-selected="false">Client setup</button>
+    </nav>
+  </header>
+
+  <!-- ======================== PLAY ======================== -->
+  <section class="view on" id="v-play" role="tabpanel">
+    <div class="card hero">
+      <div>
+        <h2>Minecraft 1.8, no install</h2>
+        <p class="lede">
+          Orion runs <strong>EaglercraftX 1.8</strong> — a full port of Minecraft 1.8 to
+          WebGL and JavaScript — straight in the browser. Add a server address once and
+          it stays in your list, on this device, ready to join in one click.
+        </p>
+        <div class="btn-row" style="margin-top:20px">
+          <button class="btn primary big" id="btn-launch">▶ Launch client</button>
+          <button class="btn big ghost" id="btn-goto-servers">Manage servers</button>
+        </div>
+        <div id="bundle-state" style="margin-top:18px"></div>
+      </div>
+      <div class="hero-art">
+        <img src="assets/orion-logo.svg" alt="">
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Jump straight into a server</h3>
+      <p>Pick a server and Orion will hand it to the client on startup, skipping the menus.</p>
+      <div id="quick-join"></div>
+    </div>
+  </section>
+
+  <!-- ======================== SERVERS ======================== -->
+  <section class="view" id="v-servers" role="tabpanel">
+
+    <div class="card">
+      <h2>Your server book <span class="pill" id="srv-count">0</span></h2>
+      <p>
+        Saved in this browser only — Orion has no accounts and no backend. Export the list
+        to move it to another device, or send someone a share link to add a server to theirs.
+      </p>
+      <div id="mixed-warning" class="note warn hide"></div>
+      <div id="srv-notice"></div>
+      <div class="srv-list" id="srv-list"></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn slim" id="btn-ping-all">Test all</button>
+        <button class="btn slim" id="btn-export">Export JSON</button>
+        <button class="btn slim" id="btn-import-open">Import JSON</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 id="form-title">Add a server</h3>
+      <div class="form-grid">
+        <label class="field">
+          <span>Name</span>
+          <input type="text" id="f-name" placeholder="My SMP" autocomplete="off" maxlength="64">
+        </label>
+        <label class="field">
+          <span>Address</span>
+          <input type="text" id="f-addr" placeholder="wss://play.example.net/" autocomplete="off" spellcheck="false">
+        </label>
+      </div>
+      <label class="field">
+        <span>Note (optional)</span>
+        <input type="text" id="f-note" placeholder="Survival · whitelist · friends only" autocomplete="off" maxlength="140">
+      </label>
+      <div id="f-error" class="note bad hide"></div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-save">Add server</button>
+        <button class="btn ghost" id="btn-cancel" style="display:none">Cancel</button>
+      </div>
+      <p class="muted mono" style="margin-top:14px" id="scheme-hint"></p>
+    </div>
+
+    <div class="card" id="import-card" style="display:none">
+      <h3>Import a server list</h3>
+      <p>Paste an exported Orion list, or any JSON array of <code>{ "name", "addr" }</code> objects.</p>
+      <textarea id="f-import" spellcheck="false" placeholder='{ "servers": [ { "name": "My SMP", "addr": "wss://play.example.net/" } ] }'></textarea>
+      <div id="import-result"></div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn primary" id="btn-import-run">Import</button>
+        <button class="btn ghost" id="btn-import-close">Close</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================== HOST ======================== -->
+  <section class="view" id="v-host" role="tabpanel">
+    <div class="card">
+      <h2>Run your own server</h2>
+      <p class="lede">
+        A normal Minecraft server does not speak WebSocket, so a browser cannot reach it.
+        <a href="https://github.com/lax1dude/eaglerxserver/releases" target="_blank" rel="noopener">EaglerXServer</a>
+        is the plugin that adds that: it opens a WebSocket listener alongside your usual
+        port and translates Eaglercraft clients onto your existing server.
+      </p>
+      <div class="note">
+        <strong>Already have a server?</strong> You do not need to move worlds or reinstall.
+        EaglerXServer drops into a server you already run, and Java players keep connecting
+        on port 25565 exactly as before.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Pick the right jar</h3>
+      <p>The release page ships several jars. You need <code>EaglerXServer.jar</code>; the rest are optional add-ons.</p>
+      <table class="tbl">
+        <thead><tr><th>Jar</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td>EaglerXServer.jar</td><td><strong>The one you need.</strong> Works on Bukkit/Spigot/Paper, BungeeCord and Velocity — the same jar detects the platform.</td></tr>
+          <tr><td>EaglerWeb.jar</td><td>Serves static files (like a client build) over the same port. Optional.</td></tr>
+          <tr><td>EaglerMOTD.jar</td><td>Richer MOTD and server-list icons for Eaglercraft clients.</td></tr>
+          <tr><td>EaglerXRewind.jar</td><td>Lets much older Eaglercraft versions (1.5.2) connect too.</td></tr>
+          <tr><td>EaglerXBackendRPC.jar</td><td>API for plugins that want Eaglercraft-specific player data.</td></tr>
+          <tr><td>EaglerXSupervisor.jar</td><td>Coordinates several proxies sharing one player pool. Large networks only.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Setup</h3>
+      <ol class="steps">
+        <li>
+          <h4>Install the plugin</h4>
+          <p>Drop <code>EaglerXServer.jar</code> into your server's <code>plugins/</code> folder and restart once so it writes its config.</p>
+          <pre class="code">plugins/EaglerXServer.jar
+plugins/EaglerXServer/          <span class="c"># created on first start</span>
+  settings.yml                  <span class="c"># listeners live here</span></pre>
+        </li>
+        <li>
+          <h4>Turn off online mode</h4>
+          <p>
+            Eaglercraft players have no Mojang account, so the server must not try to
+            authenticate them. This is required — logins fail without it.
+          </p>
+          <pre class="code"><span class="c"># Paper / Spigot — server.properties</span>
+online-mode=false
+
+<span class="c"># BungeeCord — config.yml</span>
+online_mode: false
+
+<span class="c"># Velocity — velocity.toml</span>
+player-info-forwarding-mode = "none"</pre>
+          <div class="note warn">
+            With online mode off, anyone can claim any username. Use a whitelist, or
+            EaglerXServer's own authentication, on anything but a server for friends.
+          </div>
+        </li>
+        <li>
+          <h4>Open the WebSocket listener</h4>
+          <p>
+            In <code>plugins/EaglerXServer/settings.yml</code>, the <code>listeners</code>
+            section defines where browsers connect. Note the port it binds — that number,
+            not 25565, is what players put into Orion.
+          </p>
+          <pre class="code"><span class="c"># shape of the generated config — keep the keys it wrote,</span>
+<span class="c"># just confirm the address and port</span>
+listeners:
+  - address: "0.0.0.0:8081"
+    tls_enabled: false</pre>
+          <p>Forward that port on your router or firewall if players are outside your network.</p>
+        </li>
+        <li>
+          <h4>Give it TLS, so browsers will allow it</h4>
+          <p>
+            This is the step people miss. Orion is served over <strong>HTTPS</strong>, and an
+            HTTPS page is forbidden by every browser from opening a plain <code>ws://</code>
+            socket. Your server needs a <code>wss://</code> address — meaning a real
+            certificate for a real domain.
+          </p>
+          <p>Three ways to get one, easiest first:</p>
+          <pre class="code"><span class="c"># 1. Cloudflare Tunnel — no port forwarding, free certificate</span>
+cloudflared tunnel --url http://localhost:8081
+
+<span class="c"># 2. Caddy in front of the listener — automatic Let's Encrypt</span>
+play.example.net {
+    reverse_proxy localhost:8081
+}
+
+<span class="c"># 3. TLS inside EaglerXServer itself — point settings.yml at your</span>
+<span class="c">#    own certificate and key, then set tls_enabled: true</span></pre>
+          <div class="note">
+            Cloudflare's proxy passes WebSockets through by default, so an orange-clouded
+            DNS record works without extra configuration.
+          </div>
+        </li>
+        <li>
+          <h4>Hand out the address</h4>
+          <p>
+            Add your server on the <a href="#" data-goto="servers">Servers</a> tab, press
+            <strong>Test</strong> to confirm it answers, then use <strong>Share</strong> to
+            copy a link that adds it to anyone else's Orion in one click.
+          </p>
+        </li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>When it will not connect</h3>
+      <table class="tbl">
+        <thead><tr><th>Symptom</th><th>Usual cause</th></tr></thead>
+        <tbody>
+          <tr><td>Blocked immediately</td><td>A <code>ws://</code> address on this HTTPS page. Get a <code>wss://</code> address — see step 4.</td></tr>
+          <tr><td>Times out</td><td>Port not forwarded, or the firewall is dropping it. Confirm the listener port from step 3.</td></tr>
+          <tr><td>Refused</td><td>Right host, wrong port — people often try 25565, which is the Java port, not the WebSocket one.</td></tr>
+          <tr><td>Connects, then drops</td><td>Certificate not trusted (self-signed), or a proxy in front that is not passing WebSocket upgrades.</td></tr>
+          <tr><td>Kicked at login</td><td>Online mode is still on. See step 2.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ======================== SETUP ======================== -->
+  <section class="view" id="v-setup" role="tabpanel">
+    <div class="card">
+      <h2>Client setup</h2>
+      <p class="lede">
+        Orion is the launcher — the menu, the server book, the launch button. The game
+        itself is the EaglercraftX 1.8 bundle, which is Minecraft code and is not shipped
+        with Orion. You point Orion at a bundle once and it remembers.
+      </p>
+      <div id="setup-state"></div>
+    </div>
+
+    <div class="card">
+      <h3>Where Orion looks</h3>
+      <p>
+        A bundle is two files: <code>classes.js</code> (the compiled game) and
+        <code>assets.epk</code> (its textures and sounds). Orion loads them from the
+        location below — either a folder in this repository, or any HTTPS URL.
+      </p>
+      <label class="field">
+        <span>Bundle location</span>
+        <input type="text" id="f-base" placeholder="client/" spellcheck="false">
+      </label>
+      <div id="base-error" class="note bad hide"></div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-base-save">Save &amp; test</button>
+        <button class="btn ghost" id="btn-base-reset">Reset to client/</button>
+      </div>
+      <p class="muted" style="margin-top:14px">
+        Serving from another origin needs CORS headers on that host. A folder inside this
+        site never does, which is why <code>client/</code> is the default.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3>Installing a bundle into this site</h3>
+      <ol class="steps">
+        <li>
+          <h4>Get an EaglercraftX 1.8 offline build</h4>
+          <p>
+            Obtain a build from the Eaglercraft project, and unpack it so you can see
+            <code>classes.js</code> and <code>assets.epk</code>.
+          </p>
+        </li>
+        <li>
+          <h4>Commit them to <code>orion/client/</code></h4>
+          <pre class="code">orion/client/classes.js
+orion/client/assets.epk
+orion/client/lang/          <span class="c"># optional extra languages</span></pre>
+          <p>
+            <code>classes.js</code> is large. If it is over GitHub's 100&nbsp;MB file limit,
+            host the bundle elsewhere and paste that URL into the field above instead.
+          </p>
+        </li>
+        <li>
+          <h4>Push</h4>
+          <p>GitHub Pages redeploys, and <strong>Launch client</strong> lights up.</p>
+        </li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>What Orion hands the client</h3>
+      <p>
+        On launch, Orion sets <code>window.eaglercraftXOpts</code> before the bundle
+        evaluates — seeding the in-game multiplayer list from your server book, and setting
+        <code>joinServer</code> when you launched into a specific server.
+      </p>
+      <pre class="code" id="opts-preview">…</pre>
+      <p class="muted">
+        The client keeps its own copy of the server list once you have run it, so entries
+        you add later appear as defaults rather than overwriting what you changed in-game.
+      </p>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <p>
+      <strong>Orion Client</strong> — a launcher shell for EaglercraftX 1.8, built to run on GitHub Pages.
+      Server list is stored in this browser; nothing is sent anywhere.
+    </p>
+    <p>
+      Eaglercraft and EaglerXServer are the work of
+      <a href="https://github.com/lax1dude" target="_blank" rel="noopener">lax1dude</a>.
+      Orion bundles neither, and is not affiliated with Mojang or Microsoft.
+    </p>
+  </footer>
+
+</div>
+
+<script src="js/servers.js"></script>
+<script src="js/launch.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
