@@ -102,6 +102,9 @@
 
   /* Two buttons launch the client — the hero and the play-together card — so
    * they are enabled and disabled together. */
+  const fmtSize = (n) =>
+    n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
+
   function setLaunchEnabled(on) {
     ['#btn-launch', '#btn-launch-2'].forEach((sel) => {
       const b = $(sel);
@@ -149,7 +152,7 @@
     const row = (label, r, url, optional) =>
       '<tr><td>' + esc(label) + '</td><td>' +
       (r.ok
-        ? '<span class="pill ok">found</span>' + (r.size ? ' <span class="muted">' + (r.size / 1048576).toFixed(1) + ' MB</span>' : '')
+        ? '<span class="pill ok">found</span>' + (r.size ? ' <span class="muted">' + fmtSize(r.size) + '</span>' : '')
         : optional
           ? '<span class="pill">not needed</span>'
           : '<span class="pill bad">missing</span>' + (r.status ? ' <span class="muted">HTTP ' + r.status + '</span>' : '')) +

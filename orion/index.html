@@ -399,8 +399,9 @@ play.example.net {
       <h2>Client setup</h2>
       <p class="lede">
         Orion is the launcher — the menu, the server book, the launch button. The game
-        itself is the EaglercraftX 1.8 bundle, which is Minecraft code and is not shipped
-        with Orion. You point Orion at a bundle once and it remembers.
+        itself is the EaglercraftX 1.8 bundle, and a build is already installed here, so
+        there is nothing to set up. This tab is for checking that install, or pointing
+        Orion at a different one.
       </p>
       <div id="setup-state"></div>
     </div>
@@ -408,9 +409,12 @@ play.example.net {
     <div class="card">
       <h3>Where Orion looks</h3>
       <p>
-        A bundle is two files: <code>classes.js</code> (the compiled game) and
-        <code>assets.epk</code> (its textures and sounds). Orion loads them from the
-        location below — either a folder in this repository, or any HTTPS URL.
+        Orion loads the bundle from the location below — either a folder in this
+        repository, or any HTTPS URL. <code>classes.js</code> is the compiled game and is
+        the only required file. Some builds keep their textures and sounds in a separate
+        <code>assets.epk</code>; the build installed here has them compiled in, so there
+        is nothing else to fetch. A signed build also has a small
+        <code>signature.txt</code> beside it.
       </p>
       <label class="field">
         <span>Bundle location</span>
@@ -428,28 +432,32 @@ play.example.net {
     </div>
 
     <div class="card">
-      <h3>Installing a bundle into this site</h3>
+      <h3>Replacing the bundle</h3>
       <ol class="steps">
         <li>
-          <h4>Get an EaglercraftX 1.8 offline build</h4>
+          <h4>Get the build you want</h4>
           <p>
-            Obtain a build from the Eaglercraft project, and unpack it so you can see
-            <code>classes.js</code> and <code>assets.epk</code>.
+            An EaglercraftX 1.8 offline build. If it is a single signed
+            <code>.html</code> file, the game and its assets are base64'd inside it —
+            unpack the client bundle out of it rather than committing the page.
           </p>
         </li>
         <li>
-          <h4>Commit them to <code>orion/client/</code></h4>
-          <pre class="code">orion/client/classes.js
-orion/client/assets.epk
-orion/client/lang/          <span class="c"># optional extra languages</span></pre>
+          <h4>Commit it over the current one</h4>
+          <pre class="code">orion/client/classes.js      <span class="c"># required</span>
+orion/client/signature.txt   <span class="c"># if the build is signed</span>
+orion/client/assets.epk      <span class="c"># only for a split build</span></pre>
           <p>
-            <code>classes.js</code> is large. If it is over GitHub's 100&nbsp;MB file limit,
-            host the bundle elsewhere and paste that URL into the field above instead.
+            <code>classes.js</code> is around 34&nbsp;MB. That is inside GitHub's
+            100&nbsp;MB hard limit but past its 50&nbsp;MB warning, so pushes will
+            mention it. Pages compresses JavaScript in transit, so players download
+            roughly a third of that. If a build ever exceeds 100&nbsp;MB, host it
+            elsewhere and paste the URL above.
           </p>
         </li>
         <li>
           <h4>Push</h4>
-          <p>GitHub Pages redeploys, and <strong>Launch client</strong> lights up.</p>
+          <p>Pages redeploys, and this tab will report what it found.</p>
         </li>
       </ol>
     </div>
@@ -457,10 +465,19 @@ orion/client/lang/          <span class="c"># optional extra languages</span></p
     <div class="card">
       <h3>What Orion hands the client</h3>
       <p>
-        On launch, Orion sets <code>window.eaglercraftXOpts</code> before the bundle
-        evaluates — seeding the in-game multiplayer list from your server book, and setting
-        <code>joinServer</code> when you launched into a specific server.
+        On launch, Orion writes this to <code>window.eaglercraftXOptsHints</code> before
+        the bundle evaluates — seeding the in-game multiplayer list from your server book,
+        passing your relays through, and setting <code>joinServer</code> when you launched
+        into a specific server.
       </p>
+      <div class="note">
+        <strong>Why hints and not <code>eaglercraftXOpts</code>?</strong> A modern bundle
+        adopts <code>eaglercraftXOptsHints</code> when <code>hintsVersion</code> is 1, and
+        otherwise <em>replaces</em> <code>eaglercraftXOpts</code> with its own defaults —
+        so settings written only to <code>eaglercraftXOpts</code> are discarded a moment
+        later. Orion sets both from the same object, so older bundles that read
+        <code>eaglercraftXOpts</code> directly still work.
+      </div>
       <pre class="code" id="opts-preview">…</pre>
       <p class="muted">
         The client keeps its own copy of the server list once you have run it, so entries
@@ -476,8 +493,9 @@ orion/client/lang/          <span class="c"># optional extra languages</span></p
     </p>
     <p>
       Eaglercraft and EaglerXServer are the work of
-      <a href="https://github.com/lax1dude" target="_blank" rel="noopener">lax1dude</a>.
-      Orion bundles neither, and is not affiliated with Mojang or Microsoft.
+      <a href="https://github.com/lax1dude" target="_blank" rel="noopener">lax1dude</a>;
+      the installed client is their EaglercraftX 1.8-u53 build, unmodified. Orion is the
+      launcher around it, and is not affiliated with Mojang or Microsoft.
     </p>
   </footer>
 
