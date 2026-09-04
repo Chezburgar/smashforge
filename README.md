@@ -65,6 +65,33 @@ Everything about a fighter is editable, and it all round-trips through `localSto
   mid-swing. Full frame data (startup / active / recovery) is shown per move, and the
   preview plays it back with a frame-phase scrubber.
 
+## Orion Client
+
+This repository also hosts **Orion Client** at [`orion/`](orion/) — a separate
+browser launcher for **EaglercraftX 1.8** with a built-in server book for
+joining and hosting [EaglerXServer](https://github.com/lax1dude/eaglerxserver/releases)
+servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
+
+- **Server book** — add a server once and it stays, saved in the browser. Bare
+  `host:port` gets the right scheme filled in, `ws://` on an HTTPS page is
+  caught and explained, and **Test** opens a real socket to prove the server
+  answers before you try to join.
+- **One-click join** — Orion passes the address to the client as `joinServer`,
+  so you land on the server instead of the main menu.
+- **Share links** — **Share** copies a URL that adds that server to anyone
+  else's Orion.
+- **Hosting guide** — which jar from the release page, why online mode has to
+  go off, which port players actually need, and how to get the `wss://` address
+  that browsers require.
+
+The EaglercraftX bundle itself is Minecraft code and is not committed here.
+Drop `classes.js` and `assets.epk` into [`orion/client/`](orion/client/README.md)
+(or point Orion at a URL) and **Launch client** activates. Everything else —
+the server book, the guides, testing addresses — works without it.
+
+The Orion mark is generated, not stored as a bitmap:
+`node tools/make-orion-logo.js > orion/assets/orion-logo.svg`.
+
 ## Layout
 
 ```
@@ -78,6 +105,13 @@ js/render/            prims · skeleton+poses · weapons · cosmetics · vfx · 
 js/game/              build model · fighter sim · combat · AI · match
 js/ui/                hud · preview rig · screens · designer
 tools/serve.js        optional dev server
+
+orion/index.html      Orion Client launcher (server book, guides)
+orion/js/servers.js   server book: validation, storage, reachability probes
+orion/js/launch.js    bundle discovery + eaglercraftXOpts handoff
+orion/js/app.js       launcher UI
+orion/client/         where an EaglercraftX 1.8 bundle goes
+tools/make-orion-logo.js   rasterises the Orion mark to SVG
 ```
 
 ## Notes
