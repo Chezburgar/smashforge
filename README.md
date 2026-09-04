@@ -92,6 +92,12 @@ the server book, the guides, testing addresses — works without it.
 The Orion mark is generated, not stored as a bitmap:
 `node tools/make-orion-logo.js > orion/assets/orion-logo.svg`.
 
+Pages publishes this repository from `main` using GitHub's built-in branch
+source, so merging to `main` is all that is needed to put Orion online — no
+Pages settings to change. `.github/workflows/checks.yml` validates instead of
+deploying: it parses every tracked `.js` file and fails if the committed logo
+no longer matches its generator.
+
 ## Layout
 
 ```

@@ -1,0 +1,38 @@
+name: Checks
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# GitHub Pages is published by this repository's built-in "deploy from a
+# branch" source, so this workflow only validates — it does not deploy.
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse every tracked JavaScript file
+        run: |
+          for f in $(git ls-files '*.js'); do
+            node --check "$f" || { echo "::error file=$f::failed to parse"; exit 1; }
+          done
+
+      - name: The committed Orion logo still matches its generator
+        run: |
+          node tools/make-orion-logo.js > /tmp/orion-logo.svg
+          if ! diff -q /tmp/orion-logo.svg orion/assets/orion-logo.svg; then
+            echo "::error file=orion/assets/orion-logo.svg::out of date — regenerate with 'node tools/make-orion-logo.js > orion/assets/orion-logo.svg'"
+            exit 1
+          fi
+
+      - name: The Eaglercraft bundle has not been committed by accident
+        run: |
+          if git ls-files --error-unmatch orion/client/classes.js >/dev/null 2>&1; then
+            echo "::warning file=orion/client/classes.js::a client bundle is committed; make sure it is intended and within GitHub's file size limits"
+          fi
