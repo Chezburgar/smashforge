@@ -1,53 +1,91 @@
-# Drop an EaglercraftX 1.8 bundle here
+# The EaglercraftX client bundle
 
 Orion Client is the launcher — the menu, the server book, the launch button.
-The game itself is the EaglercraftX 1.8 bundle, which is Minecraft code and so
-is **not** committed to this repository. Orion looks for it here.
+The game itself is the EaglercraftX 1.8 bundle, and it lives here.
 
-## What Orion expects
+## What is installed
+
+An **EaglercraftX 1.8-u53** offline signed build, unpacked into the two files
+Orion loads:
 
 ```
-orion/client/classes.js     the compiled game
-orion/client/assets.epk     its textures, sounds and language files
-orion/client/lang/          optional, extra .lang files
+classes.js       the compiled game, with its asset packages embedded
+signature.txt    the build's detached signature
 ```
 
-Put those two files in this folder, commit, push. GitHub Pages redeploys and
-**Launch client** becomes active. Nothing else needs configuring — `client/` is
-the default location Orion probes on load.
+There is no `assets.epk`, and that is correct for this build: the asset and
+language packages are compiled into `classes.js` as data URIs, which the bundle
+appends to its own options at startup. Orion detects this ("self-contained")
+and does not ask for an `.epk`.
 
-## If `classes.js` is too big for git
+## The two bundle shapes
 
-The compiled bundle is tens of megabytes, and GitHub rejects any single file
-over 100 MB. Two ways around it:
+| | Split build | Self-contained build |
+|---|---|---|
+| Files | `classes.js` + `assets.epk` | `classes.js` only |
+| Orion sets | `assetsURI`, `localesURI` | neither — the bundle supplies its own |
 
-- **Git LFS** — `git lfs track "orion/client/classes.js"`. The Pages workflow
-  already checks out with `lfs: true`.
-- **Host it elsewhere** — put the bundle on any HTTPS host and paste that URL
-  into *Client setup → Bundle location* in Orion. That host must send
-  `Access-Control-Allow-Origin` for the fetch of `assets.epk` to succeed;
-  a folder inside this site never needs CORS, which is why it is the default.
+Orion probes for both and adapts. Only `classes.js` decides whether it can
+launch.
 
-## How Orion talks to the bundle
+## How Orion passes settings in
 
-Before loading `classes.js`, Orion sets `window.eaglercraftXOpts`:
+The tail of `classes.js` decides where its options come from:
 
 ```js
-window.eaglercraftXOpts = {
-  container:  "game_frame",
-  assetsURI:  "client/assets.epk",
-  localesURI: "client/lang/",
-  worldsDB:   "orion_worlds",
-  servers: [ /* seeded from your server book */ ],
-  relays:  [ /* lax1dude public relays, for shared singleplayer worlds */ ],
-  joinServer: "wss://…"   /* only when you launched into a specific server */
-};
+if (window.eaglercraftXOptsHints && window.eaglercraftXOptsHints.hintsVersion === 1) {
+    window.eaglercraftXOpts = window.eaglercraftXOptsHints;   // adopts ours
+} else {
+    window.eaglercraftXOpts = { /* its own built-in defaults */ };  // discards ours
+}
+window.eaglercraftXOpts.assetsURI = [ /* embedded packages */ ];
+main();
 ```
 
-`servers` seeds the in-game multiplayer list. The client keeps its own copy once
-it has run, so servers you add in Orion later show up as defaults rather than
-overwriting what you have changed in-game — `joinServer` is what reliably drops
-you straight onto a server, and it is what the **Join** buttons use.
+So settings must be written to **`window.eaglercraftXOptsHints` with
+`hintsVersion: 1`**. Writing only `eaglercraftXOpts` is silently thrown away on
+these builds — the bundle overwrites it a moment later. Orion sets both, with
+the same object, so older bundles that read `eaglercraftXOpts` directly still
+work.
 
-You can see the exact object Orion will pass, filled in with your own server
-list, at the bottom of the *Client setup* tab.
+What gets passed:
+
+- `servers` — your server book, so it appears in the in-game multiplayer list.
+- `joinServer` — set only when you launched into a specific server, which is
+  what makes **Join** land on the server instead of the main menu.
+- `relays` — your relay book, with one marked `primary`. That is the relay a
+  shared world registers itself with.
+- `worldsDB: "worlds"` — the stock name, so worlds are where the client
+  normally keeps them.
+
+The bundle rewrites `window.eaglercraftXOpts` as it boots, so to see what it
+actually ran with, read that global after launch — not what Orion requested.
+The *Client setup* tab shows the object Orion will send.
+
+## Why signature.txt matters
+
+A signed build verifies itself. The client reads
+`window.eaglercraftXClientSignature` **once** during startup and immediately
+nulls it, so Orion fetches `signature.txt` and sets that global *before*
+injecting `classes.js`.
+
+- **With it:** the main menu reads `Digitally Signed (7/06/2025)`, and a
+  *Download Offline* button appears so players can save their own copy.
+- **Without it:** a red `Signature Invalid!` sits on the main menu. The game
+  plays fine, but the build can no longer prove it is what its author
+  published, and the warning worries people.
+
+The signature is detached and only ~1 KB, so keep the two files together. An
+unsigned build simply has no `signature.txt` and Orion skips this.
+
+## Replacing the bundle
+
+Drop in a new `classes.js` (plus `assets.epk` if it is a split build, plus its
+`signature.txt` if signed), commit, push. If you would rather host the bundle
+elsewhere, paste that URL into *Client setup → Bundle location*; that host must
+send `Access-Control-Allow-Origin`, which is why a folder inside this site is
+the default.
+
+`classes.js` is ~34 MB. That is under GitHub's 100 MB hard limit but over its
+50 MB advisory warning, so pushes mention it. GitHub Pages compresses
+JavaScript in transit, so players download roughly a third of that.

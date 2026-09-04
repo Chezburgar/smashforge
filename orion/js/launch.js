@@ -68,6 +68,25 @@ window.ORION = window.ORION || {};
 
   L.classesURL = () => L.base() + 'classes.js';
   L.assetsURL = () => L.base() + 'assets.epk';
+  L.signatureURL = () => L.base() + 'signature.txt';
+
+  /* A signed build carries a detached signature. The client reads it from
+   * window.eaglercraftXClientSignature exactly once at startup: supply it and
+   * the main menu reads "Digitally Signed" and the offline-download button
+   * appears; omit it and a signed bundle reports "Signature Invalid!", because
+   * it cannot prove it is the build its author published. Unsigned builds
+   * simply have no signature.txt and skip all of this. */
+  async function loadSignature() {
+    try {
+      const res = await fetch(L.signatureURL(), { cache: 'no-store' });
+      if (!res.ok) return null;
+      const text = (await res.text()).trim();
+      /* Must be the detached-signature data URI, not an HTML error page. */
+      return /^data:[^;]*;base64,[A-Za-z0-9+/=\s]+$/.test(text) ? text.replace(/\s+/g, '') : null;
+    } catch (e) {
+      return null;
+    }
+  }
 
   /* Check whether the bundle is actually there before launching, so a missing
    * install shows instructions instead of a blank canvas. Some static hosts
@@ -89,14 +108,25 @@ window.ORION = window.ORION || {};
     }
   }
 
+  /* Two bundle shapes exist in the wild. A "split" build ships classes.js
+   * next to assets.epk. An "offline" build has the asset packages compiled
+   * into classes.js and needs no .epk at all — so only classes.js decides
+   * whether we can launch, and assets.epk merely selects which shape we are
+   * looking at. */
   L.probe = async function () {
     const base = L.base();
-    const [classes, assets] = await Promise.all([exists(L.classesURL()), exists(L.assetsURL())]);
+    const [classes, assets, signature] = await Promise.all([
+      exists(L.classesURL()),
+      exists(L.assetsURL()),
+      exists(L.signatureURL())
+    ]);
     return {
       base: base,
       classes: classes,
       assets: assets,
-      ready: classes.ok && assets.ok
+      signature: signature,
+      selfContained: classes.ok && !assets.ok,
+      ready: classes.ok
     };
   };
 
@@ -112,40 +142,60 @@ window.ORION = window.ORION || {};
     return O.Servers.all().map((e) => ({ addr: e.addr, name: e.name }));
   }
 
-  L.buildOpts = function (containerId, joinAddr) {
+  /* Newer bundles hand their options over as "hints": the tail of classes.js
+   * adopts window.eaglercraftXOptsHints wholesale when hintsVersion is 1, and
+   * otherwise REPLACES window.eaglercraftXOpts with its own built-in defaults.
+   * So the hints object is the one that has to carry our settings — writing
+   * only eaglercraftXOpts gets silently discarded on those builds. Older split
+   * bundles read eaglercraftXOpts directly, so launch() sets both. */
+  L.buildOpts = function (containerId, joinAddr, shape) {
     const opts = {
+      hintsVersion: 1,
       container: containerId,
-      assetsURI: L.assetsURL(),
-      localesURI: L.base() + 'lang/',
-      worldsDB: 'orion_worlds',
-      resourcePacksDB: 'orion_resource_packs',
+      worldsDB: 'worlds',
       demoMode: false,
       servers: optsServers(),
-      relays: DEFAULT_RELAYS.map((r, i) => ({ addr: r.addr, comment: r.comment, primary: i === 0 }))
+      relays: O.Relays.forOpts()
     };
+    /* A self-contained build appends its own embedded assetsURI list after
+     * reading the hints, so naming a path here would only send it fetching an
+     * assets.epk that isn't there. A split build needs to be told. */
+    if (!shape || !shape.selfContained) {
+      opts.assetsURI = L.assetsURL();
+      opts.localesURI = L.base() + 'lang/';
+    }
     if (joinAddr) opts.joinServer = joinAddr;
     return opts;
   };
 
   /* Start the game. `joinAddr`, when given, drops the player straight into
    * that server instead of the main menu. */
-  L.launch = function (containerId, joinAddr) {
+  L.launch = async function (containerId, joinAddr, shape) {
+    if (launched) throw new Error('The client is already running — reload the page to start it again.');
+    if (!document.getElementById(containerId)) throw new Error('Launch container #' + containerId + ' is missing.');
+
+    /* Fetched before the bundle is injected, because the client consumes the
+     * global during its own startup and never looks again. */
+    const signature = (!shape || shape.signature === undefined || shape.signature.ok) ? await loadSignature() : null;
+    if (signature) window.eaglercraftXClientSignature = signature;
+
     return new Promise(function (resolve, reject) {
-      if (launched) return reject(new Error('The client is already running — reload the page to start it again.'));
 
-      const container = document.getElementById(containerId);
-      if (!container) return reject(new Error('Launch container #' + containerId + ' is missing.'));
-
-      /* Must exist before classes.js evaluates: the client reads it on start. */
-      window.eaglercraftXOpts = L.buildOpts(containerId, joinAddr);
-      window._eaglercraftXOpts = window.eaglercraftXOpts;
+      /* Both must exist before classes.js evaluates. Hints is what modern
+       * bundles honour; eaglercraftXOpts covers older ones that read it
+       * directly. Same object either way, so they cannot disagree. */
+      const opts = L.buildOpts(containerId, joinAddr, shape);
+      window.eaglercraftXOptsHints = opts;
+      window.eaglercraftXOpts = opts;
 
       const s = document.createElement('script');
       s.src = L.classesURL();
       s.async = false;
       s.onload = function () {
         launched = true;
-        resolve({ opts: window.eaglercraftXOpts });
+        /* The bundle rewrites window.eaglercraftXOpts as it starts, so report
+         * what it actually ended up running with, not what we asked for. */
+        resolve({ requested: opts, effective: window.eaglercraftXOpts, signed: !!signature });
       };
       s.onerror = function () {
         reject(new Error('Could not load the client bundle from ' + L.classesURL() + '.'));

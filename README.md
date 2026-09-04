@@ -84,10 +84,18 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
   go off, which port players actually need, and how to get the `wss://` address
   that browsers require.
 
-The EaglercraftX bundle itself is Minecraft code and is not committed here.
-Drop `classes.js` and `assets.epk` into [`orion/client/`](orion/client/README.md)
-(or point Orion at a URL) and **Launch client** activates. Everything else —
-the server book, the guides, testing addresses — works without it.
+- **Play together with no server at all** — the easy path, and the one most
+  people want: open a singleplayer world to other players and it registers with
+  a relay, so friends see it on their own Multiplayer screen without typing an
+  address or forwarding a port. Orion manages the relay list and can test each
+  one. See the *Play together* tab.
+
+An **EaglercraftX 1.8-u53** build is installed in
+[`orion/client/`](orion/client/README.md), so the client runs as shipped. That
+directory's README documents the bundle contract — why settings go through
+`eaglercraftXOptsHints` rather than `eaglercraftXOpts`, why there is no
+`assets.epk`, and why `signature.txt` has to be handed over before the bundle
+loads.
 
 The Orion mark is generated, not stored as a bitmap:
 `node tools/make-orion-logo.js > orion/assets/orion-logo.svg`.
@@ -116,7 +124,8 @@ orion/index.html      Orion Client launcher (server book, guides)
 orion/js/servers.js   server book: validation, storage, reachability probes
 orion/js/launch.js    bundle discovery + eaglercraftXOpts handoff
 orion/js/app.js       launcher UI
-orion/client/         where an EaglercraftX 1.8 bundle goes
+orion/js/relays.js    relay book: the no-server path for playing together
+orion/client/         the EaglercraftX 1.8 bundle + its signature
 tools/make-orion-logo.js   rasterises the Orion mark to SVG
 ```
 

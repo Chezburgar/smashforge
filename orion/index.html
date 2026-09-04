@@ -42,6 +42,7 @@
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button role="tab" data-view="play"    aria-selected="true">Play</button>
       <button role="tab" data-view="servers" aria-selected="false">Servers</button>
+      <button role="tab" data-view="friends"  aria-selected="false">Play together</button>
       <button role="tab" data-view="host"    aria-selected="false">Host a server</button>
       <button role="tab" data-view="setup"   aria-selected="false">Client setup</button>
     </nav>
@@ -69,8 +70,21 @@
     </div>
 
     <div class="card">
-      <h3>Jump straight into a server</h3>
-      <p>Pick a server and Orion will hand it to the client on startup, skipping the menus.</p>
+      <h3>Play with a friend — nothing to set up</h3>
+      <p>
+        You do not need a server to play together. Launch the client, make a
+        singleplayer world, share it, and the client hands you a short code your
+        friend types in. <a href="#" data-goto="friends">How it works →</a>
+      </p>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-launch-2">▶ Launch client</button>
+        <button class="btn ghost" id="btn-goto-friends">Read the walkthrough</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Or jump straight into a server</h3>
+      <p>For a world that stays up when you close the tab. Orion hands the address to the client on startup, skipping the menus.</p>
       <div id="quick-join"></div>
     </div>
   </section>
@@ -127,6 +141,129 @@
         <button class="btn primary" id="btn-import-run">Import</button>
         <button class="btn ghost" id="btn-import-close">Close</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ======================== FRIENDS ======================== -->
+  <section class="view" id="v-friends" role="tabpanel">
+    <div class="card">
+      <h2>Play together, with nothing to set up</h2>
+      <p class="lede">
+        This is the easy way, and it is built into the client. One of you makes an
+        ordinary singleplayer world and shares it; everyone else joins with a short
+        code. No server to install, no ports to forward, no domain, no certificate.
+      </p>
+      <div class="note">
+        <strong>The catch, so it does not surprise you:</strong> the world runs inside
+        the host's browser tab. When the host closes the tab, the world closes for
+        everyone. For a world that stays up on its own, you want
+        <a href="#" data-goto="host">a real server</a> instead.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>If you are hosting</h3>
+      <ol class="steps">
+        <li>
+          <h4>Launch Orion and make a world</h4>
+          <p>Press <strong>Launch client</strong>, then <em>Singleplayer</em> → <em>Create New World</em>. Play it as normal. An existing world works too.</p>
+        </li>
+        <li>
+          <h4>Share it from the pause menu</h4>
+          <p>
+            Press <kbd>Esc</kbd> and choose the option to open the world to other
+            players. The client registers the world with your <strong>primary relay</strong>
+            (see below) and reports that it is open.
+          </p>
+        </li>
+        <li>
+          <h4>Your friends will just see it</h4>
+          <p>
+            On their Multiplayer screen your world appears by itself under
+            <em>“Scanning for games on your local network”</em> — the relay is what
+            tells them about it, so they do not need to be on your network or type
+            anything. You can also show a join code from the pause menu if you would
+            rather hand one out.
+          </p>
+        </li>
+        <li>
+          <h4>Stay in the world</h4>
+          <p>Keep the tab open and stay in the world. You are the server — if you leave, so does everyone else.</p>
+        </li>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h3>If you are joining</h3>
+      <ol class="steps">
+        <li>
+          <h4>Open the same Orion page and launch</h4>
+          <p>Any device, any browser. Nothing to install.</p>
+        </li>
+        <li>
+          <h4>Go to Multiplayer and wait a moment</h4>
+          <p>
+            Under your server list you will see <em>“Scanning for games on your local
+            network”</em>. Despite the wording, this is not limited to your house — the
+            client is asking the relay who is sharing a world, so the host's world
+            appears here even if they are on the other side of the planet.
+          </p>
+        </li>
+        <li>
+          <h4>Click the world when it shows up</h4>
+          <p>
+            That is the whole thing. If the host chose to hide their world, ask them to
+            show the code instead and use that. If nothing appears, you are probably on
+            different relays — compare the primary below.
+          </p>
+        </li>
+      </ol>
+      <div class="note warn">
+        Sessions are temporary. If the host closes the world and reopens it, joiners
+        need to look it up again.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>What to expect the very first time</h3>
+      <p>The client asks three quick questions before you reach the menu. This is normal and only happens once:</p>
+      <table class="tbl">
+        <thead><tr><th>Screen</th><th>What to do</th></tr></thead>
+        <tbody>
+          <tr><td>Content Warning</td><td>Turn the profanity filter on or off, then <strong>Done</strong>.</td></tr>
+          <tr><td>Edit Profile</td><td>Pick your username and skin, then <strong>Done</strong>. This is the name other players see.</td></tr>
+          <tr><td>Default Username Detected</td><td>It warns that the auto-generated name may be taken. <strong>Change Username</strong>, or <strong>Continue Anyway</strong>.</td></tr>
+        </tbody>
+      </table>
+      <p class="muted">After that, launching goes straight to the Minecraft main menu.</p>
+    </div>
+
+    <div class="card">
+      <h2>Relays <span class="pill" id="relay-count">0</span></h2>
+      <p>
+        A relay is only an introduction service: it puts the two browsers in touch,
+        then the game data goes directly between you. It never holds your world.
+        The <strong>primary</strong> relay is the one a newly shared world registers
+        with — host and joiner should have the same one reachable.
+      </p>
+      <div id="relay-notice"></div>
+      <div class="srv-list" id="relay-list"></div>
+      <div class="btn-row" style="margin-top:18px">
+        <button class="btn slim" id="btn-relay-ping-all">Test all</button>
+        <button class="btn slim ghost" id="btn-relay-reset">Restore defaults</button>
+      </div>
+      <div class="form-grid" style="margin-top:20px">
+        <label class="field">
+          <span>Add a relay — label</span>
+          <input type="text" id="f-relay-comment" placeholder="My relay" autocomplete="off" maxlength="64">
+        </label>
+        <label class="field">
+          <span>Address</span>
+          <input type="text" id="f-relay-addr" placeholder="wss://relay.example.net/" autocomplete="off" spellcheck="false">
+        </label>
+      </div>
+      <div id="relay-error" class="note bad hide"></div>
+      <button class="btn primary" id="btn-relay-add">Add relay</button>
     </div>
   </section>
 
@@ -347,6 +484,7 @@ orion/client/lang/          <span class="c"># optional extra languages</span></p
 </div>
 
 <script src="js/servers.js"></script>
+<script src="js/relays.js"></script>
 <script src="js/launch.js"></script>
 <script src="js/app.js"></script>
 </body>
