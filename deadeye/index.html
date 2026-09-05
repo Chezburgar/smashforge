@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DEADEYE — browser arena FPS</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="description" content="DEADEYE — a fast low-poly arena shooter that runs entirely in the browser. Six maps, nine weapons, procedural audio, bots and peer-to-peer multiplayer.">
+<meta name="theme-color" content="#0d1016">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<canvas id="view"></canvas>
+<canvas id="hud-canvas"></canvas>
+
+<!-- ============================= HUD ============================= -->
+<div id="hud">
+  <div id="hud-top">
+    <div id="hud-score"></div>
+    <div id="hud-timer">0:00</div>
+  </div>
+
+  <div id="hud-killfeed"></div>
+  <div id="hud-fps"></div>
+  <div id="hud-streak"></div>
+  <div id="hud-notify"></div>
+  <div id="hud-reload-prompt">RELOAD <b>R</b></div>
+
+  <div id="hud-bottom">
+    <div id="hud-health">
+      <div id="hud-health-value">100</div>
+      <div id="hud-health-track"><div id="hud-health-bar"></div></div>
+      <div class="hud-label">HEALTH</div>
+    </div>
+    <div id="hud-ammo">
+      <div id="hud-weapon-name">RK-77</div>
+      <div id="hud-ammo-row">
+        <span id="hud-ammo-mag">30</span><span id="hud-ammo-reserve">/ 210</span>
+      </div>
+      <div id="hud-grenade-row"><span class="pip">✦</span><span id="hud-grenades">2</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================== SCOREBOARD ========================== -->
+<div id="scoreboard">
+  <div class="panel">
+    <h2 id="scoreboard-title">FREE FOR ALL</h2>
+    <table>
+      <thead><tr><th>#</th><th>PLAYER</th><th>K</th><th>D</th><th>K/D</th></tr></thead>
+      <tbody id="scoreboard-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ========================= DEATH SCREEN ========================= -->
+<div id="death-screen">
+  <div class="death-inner">
+    <h2>YOU DIED</h2>
+    <p id="death-by"></p>
+    <div class="respawn">RESPAWN IN <b id="death-timer">3.0</b></div>
+    <div class="respawn-hint">click to respawn</div>
+  </div>
+</div>
+
+<!-- =========================== RESULTS =========================== -->
+<div id="results">
+  <div class="panel">
+    <h1 id="results-title">MATCH OVER</h1>
+    <table>
+      <thead><tr><th>#</th><th>PLAYER</th><th>K</th><th>D</th><th>K/D</th></tr></thead>
+      <tbody id="results-body"></tbody>
+    </table>
+    <div class="row-btns">
+      <button class="primary" data-act="rematch">PLAY AGAIN</button>
+      <button data-act="quit">MAIN MENU</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ MENUS ============================ -->
+<div id="menu-overlay">
+  <div class="bg-grid"></div>
+
+  <!-- main -->
+  <section id="screen-main" class="screen">
+    <div class="brand">
+      <h1>DEAD<span>EYE</span></h1>
+      <p class="tagline">low-poly arena combat · six theatres · nine weapons</p>
+    </div>
+    <nav class="mainnav">
+      <button class="primary" data-go="play">PLAY</button>
+      <button data-go="loadout">LOADOUT</button>
+      <button data-go="multiplayer">MULTIPLAYER</button>
+      <button data-go="settings">SETTINGS</button>
+      <button data-go="controls">CONTROLS</button>
+    </nav>
+    <p class="footnote">WASD move · SHIFT sprint · CTRL crouch · SPACE jump · R reload · G grenade · V melee · TAB scores</p>
+  </section>
+
+  <!-- play -->
+  <section id="screen-play" class="screen wide">
+    <header><button class="back" data-go="back">‹ BACK</button><h2>DEPLOY</h2></header>
+
+    <div class="cols">
+      <div class="col grow">
+        <h3>MAP</h3>
+        <div id="map-list" class="grid"></div>
+      </div>
+
+      <div class="col side">
+        <h3>MODE</h3>
+        <div id="mode-list" class="pills">
+          <button class="pill" data-mode="ffa">FREE FOR ALL</button>
+          <button class="pill" data-mode="tdm">TEAM DEATHMATCH</button>
+        </div>
+
+        <h3>BOT SKILL</h3>
+        <div id="diff-list" class="pills">
+          <button class="pill" data-diff="recruit">RECRUIT</button>
+          <button class="pill" data-diff="regular">REGULAR</button>
+          <button class="pill" data-diff="veteran">VETERAN</button>
+          <button class="pill" data-diff="elite">ELITE</button>
+        </div>
+
+        <h3>BOTS <b id="bot-count-label">7</b></h3>
+        <input type="range" id="bot-count" min="0" max="11" step="1" value="7">
+
+        <h3>CALLSIGN</h3>
+        <input type="text" id="player-name" maxlength="14" spellcheck="false" value="PLAYER">
+
+        <button class="primary big" data-act="deploy">DEPLOY</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- loadout -->
+  <section id="screen-loadout" class="screen wide">
+    <header><button class="back" data-go="back">‹ BACK</button><h2>LOADOUT</h2></header>
+    <h3>PRIMARY</h3>
+    <div id="primary-list" class="wgrid"></div>
+    <h3>SECONDARY</h3>
+    <div id="secondary-list" class="wgrid two"></div>
+    <p class="footnote">Knife and frag grenade are always carried.</p>
+  </section>
+
+  <!-- multiplayer -->
+  <section id="screen-multiplayer" class="screen">
+    <header><button class="back" data-go="back">‹ BACK</button><h2>MULTIPLAYER</h2></header>
+    <p class="blurb">
+      Direct peer-to-peer over WebRTC — no server in the middle. One player hosts and
+      shares a lobby code; the other sends a reply code back. Relayed through a TURN
+      service when a direct connection isn't possible.
+    </p>
+    <div class="row-btns">
+      <button class="primary" id="mp-host">HOST A GAME</button>
+      <button id="mp-join">JOIN A GAME</button>
+    </div>
+
+    <div id="mp-step-host" class="mp-step">
+      <label>1 · SEND THIS LOBBY CODE TO YOUR FRIEND</label>
+      <div class="codebox"><textarea id="mp-code-out" readonly rows="3"></textarea>
+        <button data-copy="mp-code-out">COPY</button></div>
+      <label>2 · PASTE THEIR REPLY CODE HERE</label>
+      <div class="codebox"><textarea id="mp-answer-in" rows="3" spellcheck="false"
+        placeholder="paste reply code"></textarea>
+        <button id="mp-accept" class="primary">CONNECT</button></div>
+    </div>
+
+    <div id="mp-step-join" class="mp-step">
+      <label>1 · PASTE THE HOST'S LOBBY CODE</label>
+      <div class="codebox"><textarea id="mp-code-in" rows="3" spellcheck="false"
+        placeholder="paste lobby code"></textarea>
+        <button id="mp-join-go" class="primary">GENERATE REPLY</button></div>
+      <label>2 · SEND THIS REPLY CODE BACK TO THE HOST</label>
+      <div class="codebox"><textarea id="mp-reply-out" readonly rows="3"></textarea>
+        <button data-copy="mp-reply-out">COPY</button></div>
+    </div>
+
+    <div class="mp-foot">
+      <span id="mp-status">idle</span>
+      <button id="mp-disconnect" class="small">DISCONNECT</button>
+    </div>
+  </section>
+
+  <!-- settings -->
+  <section id="screen-settings" class="screen">
+    <header><button class="back" data-go="back">‹ BACK</button><h2>SETTINGS</h2></header>
+
+    <div class="setrow"><label>MOUSE SENSITIVITY</label>
+      <input type="range" id="set-sens" min="4" max="120" step="1">
+      <b id="set-sens-label">0.22</b></div>
+    <div class="setrow"><label>ADS SENSITIVITY</label>
+      <input type="range" id="set-adssens" min="20" max="150" step="1">
+      <b id="set-adssens-label">0.72</b></div>
+    <div class="setrow"><label>FIELD OF VIEW</label>
+      <input type="range" id="set-fov" min="70" max="115" step="1">
+      <b id="set-fov-label">90°</b></div>
+
+    <div class="setrow"><label>MASTER VOLUME</label>
+      <input type="range" id="set-vol-master" min="0" max="100" step="1">
+      <b id="set-vol-master-label">80%</b></div>
+    <div class="setrow"><label>EFFECTS VOLUME</label>
+      <input type="range" id="set-vol-sfx" min="0" max="100" step="1">
+      <b id="set-vol-sfx-label">100%</b></div>
+    <div class="setrow"><label>AMBIENCE VOLUME</label>
+      <input type="range" id="set-vol-amb" min="0" max="100" step="1">
+      <b id="set-vol-amb-label">50%</b></div>
+
+    <div class="setrow"><label>QUALITY</label>
+      <select id="set-quality">
+        <option value="high">HIGH</option>
+        <option value="medium">MEDIUM</option>
+        <option value="low">LOW</option>
+      </select><b></b></div>
+    <div class="setrow"><label>SHADOWS</label>
+      <input type="checkbox" id="set-shadows"><b></b></div>
+    <div class="setrow"><label>INVERT LOOK</label>
+      <input type="checkbox" id="set-invert"><b></b></div>
+    <div class="setrow"><label>SHOW FPS</label>
+      <input type="checkbox" id="set-fps"><b></b></div>
+  </section>
+
+  <!-- controls -->
+  <section id="screen-controls" class="screen">
+    <header><button class="back" data-go="back">‹ BACK</button><h2>CONTROLS</h2></header>
+    <div id="bind-list"></div>
+    <div class="row-btns"><button data-act="reset-binds">RESET TO DEFAULTS</button></div>
+  </section>
+
+  <!-- pause -->
+  <section id="screen-pause" class="screen">
+    <div class="brand small"><h1>PAUSED</h1></div>
+    <nav class="mainnav">
+      <button class="primary" data-act="resume">RESUME</button>
+      <button data-go="loadout">LOADOUT</button>
+      <button data-go="settings">SETTINGS</button>
+      <button data-go="controls">CONTROLS</button>
+      <button data-act="quit">QUIT TO MENU</button>
+    </nav>
+  </section>
+</div>
+
+<!-- ============================ BOOT ============================ -->
+<div id="boot"><div class="boot-inner"><h1>DEAD<span>EYE</span></h1><p>loading…</p></div></div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/core/util.js"></script>
+<script src="js/core/geo.js"></script>
+<script src="js/core/collision.js"></script>
+<script src="js/core/audio.js"></script>
+<script src="js/core/input.js"></script>
+<script src="js/world/props.js"></script>
+<script src="js/world/maps.js"></script>
+<script src="js/world/nav.js"></script>
+<script src="js/game/weapons.js"></script>
+<script src="js/game/viewmodel.js"></script>
+<script src="js/game/character.js"></script>
+<script src="js/game/fx.js"></script>
+<script src="js/game/player.js"></script>
+<script src="js/game/bots.js"></script>
+<script src="js/game/game.js"></script>
+<script src="js/ui/hud.js"></script>
+<script src="js/ui/menu.js"></script>
+<script src="js/net/net.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
