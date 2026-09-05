@@ -132,6 +132,31 @@ name cannot smuggle markup into anyone's page.
 Appearing in the list is opt-in and off on every load: the name you type there
 is visible to strangers, which the tab says plainly before you go online.
 
+### TURN for shared worlds
+
+A shared world is a direct WebRTC connection between two browsers, which many
+networks do not allow. A TURN server forwards the traffic instead, and it is
+the only thing that helps once a direct connection is impossible — the TURN
+servers that shipped with Eaglercraft stopped answering in 2024.
+
+The client has no option for ICE servers: it uses whatever list the relay hands
+it. So `orion/js/turn.js` wraps `RTCPeerConnection` before the bundle is
+injected, and every peer connection the game opens is built with our servers
+instead. The bundle is not modified — editing it would break its signature.
+
+The provider's API key is **not** in this repository. It sits in the
+`orion-turn` Edge Function in the Supabase project; the page only ever receives
+the short-lived credentials that function returns, and the function caches them
+in `orion_client_turn_cache` (service-role only) so the provider is called at
+most twice an hour however often the endpoint is hit. An in-process cache was
+tried first and cached nothing: Edge Functions get a fresh isolate per request.
+
+Set `config.turn.credentialsUrl` to the provider directly if you would rather
+skip the proxy, but then the key is readable by every visitor. `mode` chooses
+between replacing the relay's ICE list (`replace`) and adding to it (`append`).
+If the fetch fails, the game keeps the relay's list — a broken TURN endpoint
+leaves shared worlds exactly as they were rather than worse.
+
 ## Layout
 
 ```
@@ -152,7 +177,8 @@ orion/js/launch.js    bundle discovery + eaglercraftXOpts handoff
 orion/js/app.js       launcher UI
 orion/js/relays.js    relay book: the no-server path for playing together
 orion/js/lobby.js     players list, play requests (Supabase-backed)
-orion/js/config.js    lobby endpoint; blank it to disable the players list
+orion/js/turn.js      TURN injection for shared worlds
+orion/js/config.js    lobby + TURN endpoints; blank either to disable it
 orion/client/         the EaglercraftX 1.8 bundle + its signature
 tools/make-orion-logo.js   rasterises the Orion mark to SVG
 ```

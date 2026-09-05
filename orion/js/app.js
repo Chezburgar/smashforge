@@ -84,7 +84,7 @@
       try { history.replaceState(null, '', '#' + view); } catch (e) { /* ignore */ }
     }
     if (view === 'setup') refreshSetup();
-    if (view === 'friends') renderRelays();
+    if (view === 'friends') { renderRelays(); renderTurn(); }
     if (view === 'players') { renderLobby(); pollLobby(); }
     scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -600,6 +600,71 @@
     );
   });
 
+  /* ============================== TURN ============================== */
+  const Tn = O.Turn;
+
+  function renderTurn() {
+    const st = Tn.state();
+    const pill = $('#turn-pill');
+    const box = $('#turn-state');
+    if (!box) return;
+
+    if (!st.configured) {
+      pill.className = 'pill';
+      pill.textContent = 'not set up';
+      box.innerHTML =
+        '<div class="note warn">No TURN endpoint is configured, so shared worlds rely on a ' +
+        'direct connection between the two browsers. That works on most home networks and ' +
+        'fails on most restricted ones.</div>';
+      return;
+    }
+
+    const turns = st.servers.filter((s) => s.kind !== 'stun');
+    if (st.count && turns.length) {
+      pill.className = 'pill ok';
+      pill.textContent = 'active';
+      box.innerHTML =
+        '<div class="note ok"><strong>' + turns.length + ' TURN server' + (turns.length === 1 ? '' : 's') +
+        ' in use</strong>, plus ' + (st.count - turns.length) + ' STUN. ' +
+        'Applied to every connection the game opens' +
+        (st.mode === 'replace' ? ', in place of the relay\'s list' : ', alongside the relay\'s list') + '.</div>' +
+        '<table class="tbl"><thead><tr><th>Server</th><th>Type</th><th>Credentials</th></tr></thead><tbody>' +
+        st.servers.map((s) =>
+          '<tr><td>' + esc(s.urls.join(', ')) + '</td><td>' +
+          (s.kind === 'turns' ? '<span class="pill ok">TURN + TLS</span>'
+            : s.kind === 'turn' ? '<span class="pill">TURN</span>'
+            : '<span class="pill">STUN</span>') +
+          '</td><td>' + (s.hasCredential ? 'yes' : '<span class="muted">none needed</span>') + '</td></tr>'
+        ).join('') +
+        '</tbody></table>' +
+        '<p class="muted">Fetched ' + esc(st.fetchedAt || 'just now') +
+        '. Credentials are short-lived and are renewed while Orion stays open.</p>';
+    } else if (st.count) {
+      pill.className = 'pill warn';
+      pill.textContent = 'STUN only';
+      box.innerHTML =
+        '<div class="note warn"><strong>No TURN server came back</strong> — only STUN. ' +
+        'Direct connections will still work; blocked networks will not.</div>';
+    } else {
+      pill.className = 'pill bad';
+      pill.textContent = 'unavailable';
+      box.innerHTML =
+        '<div class="note bad"><strong>Could not get TURN servers.</strong> ' +
+        esc(st.error || 'The endpoint did not answer.') +
+        ' Shared worlds fall back to a direct connection, which is what they did before — ' +
+        'so this makes nothing worse, it just will not rescue a blocked network.</div>';
+    }
+  }
+
+  $('#btn-turn-test').addEventListener('click', async function () {
+    this.disabled = true;
+    this.textContent = 'Testing…';
+    await Tn.refresh();
+    this.disabled = false;
+    this.textContent = 'Test TURN';
+    renderTurn();
+  });
+
   /* ============================== lobby ============================== */
   const Lb = O.Lobby;
 
@@ -890,11 +955,26 @@
     $('#boot').classList.add('on');
     $('#shell').style.display = 'none';
 
+    /* Must happen before the bundle is injected: the wrapper has to be in
+     * place on window before the game captures the constructor. A failure here
+     * is not fatal — the game falls back to the relay's own ICE list. */
+    if (Tn.configured()) {
+      $('#boot-sub').textContent = 'Preparing connection servers…';
+      try {
+        await Tn.prepare();
+      } catch (e) { /* shared worlds simply stay as they were */ }
+      $('#boot-sub').textContent = entry ? entry.addr : 'Loading EaglercraftX 1.8';
+    }
+
     try {
       await L.launch('game_frame', entry ? entry.addr : null, p);
       $('#game-shell').classList.add('on');
       $('#game-exit').style.display = '';
       watchPointerLock();
+      const ts = Tn.state();
+      if (ts.installed && ts.count) {
+        console.info('[Orion] ' + ts.count + ' ICE server(s) applied to the game (' + ts.mode + ')');
+      }
       if (Lb.isOnline()) Lb.setActivity({ status: Lb.me().code ? 'hosting' : 'playing' });
       O.stopStars && O.stopStars();
       /* The client paints over the boot screen itself; drop it once the

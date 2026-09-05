@@ -326,6 +326,26 @@
     </div>
 
     <div class="card">
+      <h2>TURN <span class="pill" id="turn-pill">checking…</span></h2>
+      <p>
+        When a shared world will not connect, this is usually why. Two browsers
+        normally talk to each other directly, and plenty of networks — school and
+        office ones especially — do not allow that. A <strong>TURN</strong> server
+        forwards the traffic through a host both sides can reach, which is the only
+        thing that helps once a direct connection is impossible.
+      </p>
+      <p>
+        Orion supplies its own TURN servers, because the ones that came with
+        Eaglercraft stopped answering in 2024. The client has no setting for this, so
+        Orion applies them to every connection the game opens as it launches.
+      </p>
+      <div id="turn-state"></div>
+      <div class="btn-row">
+        <button class="btn slim" id="btn-turn-test">Test TURN</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Relays <span class="pill" id="relay-count">0</span></h2>
       <p>
         A relay is only an introduction service: it puts the two browsers in touch,
@@ -680,6 +700,7 @@ orion/client/assets.epk      <span class="c"># only for a split build</span></pr
 <script src="js/servers.js"></script>
 <script src="js/relays.js"></script>
 <script src="js/lobby.js"></script>
+<script src="js/turn.js"></script>
 <script src="js/launch.js"></script>
 <script src="js/app.js"></script>
 </body>
