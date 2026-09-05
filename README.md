@@ -88,7 +88,14 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
   people want: open a singleplayer world to other players and it registers with
   a relay, so friends see it on their own Multiplayer screen without typing an
   address or forwarding a port. Orion manages the relay list and can test each
-  one. See the *Play together* tab.
+  one. See the *Together* tab.
+- **A players list** — everyone with Orion open who has chosen to appear, what
+  they are hosting, and a request you can send to ask into their world. Hosts
+  either publish their join code openly or keep it hidden until they accept.
+- **A free-hosting route** — for a world that outlives the host's tab, the
+  *Host* tab walks through creating a free server on FalixNodes and putting
+  EaglerXServer on it, including the `wss://` requirement that decides whether
+  it will work at all.
 
 An **EaglercraftX 1.8-u53** build is installed in
 [`orion/client/`](orion/client/README.md), so the client runs as shipped. That
@@ -105,6 +112,25 @@ source, so merging to `main` is all that is needed to put Orion online — no
 Pages settings to change. `.github/workflows/checks.yml` validates instead of
 deploying: it parses every tracked `.js` file and fails if the committed logo
 no longer matches its generator.
+
+### The players list needs a backend
+
+Everything else in Orion is static and per-browser. "Who is online" cannot be,
+so it lives in Supabase — three functions and a view behind
+`orion/js/config.js`. Blank out `config.lobby.url` and the tab disappears while
+the rest of Orion carries on.
+
+There are no accounts. Each browser mints a random session id and a secret;
+the secret proves the row is yours and only its hash is stored. The tables
+themselves are unreachable with the publishable key — `anon` has no grant on
+them at all — and every write goes through a `SECURITY DEFINER` function that
+checks the secret first. Reads come from a view that omits secrets, drops rows
+older than 75 seconds, and withholds a host's join code unless they chose to
+publish it. Usernames are stripped to `[A-Za-z0-9 _-.]` before storage, so a
+name cannot smuggle markup into anyone's page.
+
+Appearing in the list is opt-in and off on every load: the name you type there
+is visible to strangers, which the tab says plainly before you go online.
 
 ## Layout
 
@@ -125,6 +151,8 @@ orion/js/servers.js   server book: validation, storage, reachability probes
 orion/js/launch.js    bundle discovery + eaglercraftXOpts handoff
 orion/js/app.js       launcher UI
 orion/js/relays.js    relay book: the no-server path for playing together
+orion/js/lobby.js     players list, play requests (Supabase-backed)
+orion/js/config.js    lobby endpoint; blank it to disable the players list
 orion/client/         the EaglercraftX 1.8 bundle + its signature
 tools/make-orion-logo.js   rasterises the Orion mark to SVG
 ```

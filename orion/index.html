@@ -42,9 +42,10 @@
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button role="tab" data-view="play"    aria-selected="true">Play</button>
       <button role="tab" data-view="servers" aria-selected="false">Servers</button>
-      <button role="tab" data-view="friends"  aria-selected="false">Play together</button>
-      <button role="tab" data-view="host"    aria-selected="false">Host a server</button>
-      <button role="tab" data-view="setup"   aria-selected="false">Client setup</button>
+      <button role="tab" data-view="players" aria-selected="false">Players</button>
+      <button role="tab" data-view="friends"  aria-selected="false">Together</button>
+      <button role="tab" data-view="host"    aria-selected="false">Host</button>
+      <button role="tab" data-view="setup"   aria-selected="false">Setup</button>
     </nav>
   </header>
 
@@ -144,6 +145,86 @@
     </div>
   </section>
 
+  <!-- ======================== PLAYERS ======================== -->
+  <section class="view" id="v-players" role="tabpanel">
+    <div class="card">
+      <h2>Who's online <span class="pill" id="players-count">0</span></h2>
+      <p class="lede">
+        Everyone with Orion open who has chosen to appear here. Find someone hosting a
+        world, ask to join, and they can let you in.
+      </p>
+      <div id="lobby-off">
+        <div class="note">
+          <strong>You are not listed yet.</strong> Pick a name and go online. Your name
+          becomes visible to anyone else with this page open — so pick a nickname, not
+          your real name, and nothing you would mind strangers seeing. Nothing else is
+          shared: no email, no location, no IP address.
+        </div>
+        <div class="form-grid">
+          <label class="field">
+            <span>Your name here</span>
+            <input type="text" id="f-lobby-name" placeholder="Nickname" autocomplete="off" maxlength="20">
+          </label>
+          <div style="align-self:end;padding-bottom:14px">
+            <button class="btn primary" id="btn-go-online">Go online</button>
+          </div>
+        </div>
+        <div id="lobby-error" class="note bad hide"></div>
+      </div>
+
+      <div id="lobby-on" style="display:none">
+        <div class="note ok" id="lobby-status"></div>
+        <div class="btn-row">
+          <button class="btn slim" id="btn-refresh-players">Refresh</button>
+          <button class="btn slim ghost" id="btn-go-offline">Go offline</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="host-card" style="display:none">
+      <h3>Let people into your world</h3>
+      <p>
+        Open your world to other players in the game (<kbd>Esc</kbd> → the share option),
+        and the client shows a <strong>join code</strong>. Orion cannot read that code off
+        the game screen, so paste it here and other players can use it.
+      </p>
+      <div class="form-grid">
+        <label class="field">
+          <span>World name (shown to others)</span>
+          <input type="text" id="f-world-name" placeholder="My survival world" autocomplete="off" maxlength="40">
+        </label>
+        <label class="field">
+          <span>Join code from the game</span>
+          <input type="text" id="f-world-code" placeholder="paste the code here" autocomplete="off" spellcheck="false" maxlength="64">
+        </label>
+      </div>
+      <label class="field" style="display:flex;gap:10px;align-items:flex-start">
+        <input type="checkbox" id="f-world-open" style="width:auto;margin-top:3px">
+        <span style="letter-spacing:0;text-transform:none;font-size:14.5px;color:var(--txt2)">
+          <strong style="color:var(--txt)">Let anyone join without asking.</strong>
+          Leave this off and your code stays hidden until you accept a request.
+        </span>
+      </label>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-save-world">Save</button>
+        <button class="btn ghost" id="btn-clear-world">Stop hosting</button>
+      </div>
+      <div id="world-error" class="note bad hide"></div>
+    </div>
+
+    <div class="card" id="requests-card" style="display:none">
+      <h3>Requests <span class="pill" id="req-count">0</span></h3>
+      <div id="req-notice"></div>
+      <div class="srv-list" id="req-list"></div>
+    </div>
+
+    <div class="card" id="players-card" style="display:none">
+      <h3>Players</h3>
+      <div id="players-notice"></div>
+      <div class="srv-list" id="players-list"></div>
+    </div>
+  </section>
+
   <!-- ======================== FRIENDS ======================== -->
   <section class="view" id="v-friends" role="tabpanel">
     <div class="card">
@@ -222,6 +303,12 @@
         Sessions are temporary. If the host closes the world and reopens it, joiners
         need to look it up again.
       </div>
+      <div class="note">
+        <strong>Playing with strangers rather than friends?</strong> The
+        <a href="#" data-goto="players">Players</a> tab lists everyone who has Orion open
+        and has chosen to appear, so you can ask to join a world without swapping codes
+        anywhere else first.
+      </div>
     </div>
 
     <div class="card">
@@ -281,6 +368,91 @@
         <strong>Already have a server?</strong> You do not need to move worlds or reinstall.
         EaglerXServer drops into a server you already run, and Java players keep connecting
         on port 25565 exactly as before.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Easiest route: get a free server</h2>
+      <p class="lede">
+        You do not need a spare computer, and you should not leave your own PC running as
+        a server for friends. A free host runs it for you.
+      </p>
+      <div class="btn-row" style="margin:4px 0 20px">
+        <a class="btn primary big" href="https://client.falixnodes.net/create" target="_blank" rel="noopener noreferrer">
+          Create a free server on FalixNodes ↗
+        </a>
+      </div>
+
+      <h3>What that gives you</h3>
+      <p>
+        FalixNodes hands you a real Minecraft server on their machines, at no cost and
+        without a card. You get a control panel: start and stop it, edit
+        <code>server.properties</code>, upload plugins, read the console. It is an ordinary
+        server — so everything on this page applies to it, EaglerXServer included.
+      </p>
+
+      <h3>How it works, step by step</h3>
+      <ol class="steps">
+        <li>
+          <h4>Create the server</h4>
+          <p>
+            Sign up on the link above and create a server. Choose a
+            <strong>1.8.x</strong> version so it matches this client — Paper or Spigot for a
+            single world, or BungeeCord/Velocity if you plan to link several.
+          </p>
+        </li>
+        <li>
+          <h4>Install EaglerXServer on it</h4>
+          <p>
+            Open the panel's file manager, upload
+            <code>EaglerXServer.jar</code> into <code>plugins/</code>, and restart the
+            server once so it writes its config. Same jar, same steps as below.
+          </p>
+        </li>
+        <li>
+          <h4>Turn off online mode</h4>
+          <p>
+            In the panel, edit <code>server.properties</code> and set
+            <code>online-mode=false</code>, then restart. Without this every Eaglercraft
+            login is rejected. Details in step 2 below.
+          </p>
+        </li>
+        <li>
+          <h4>Find your WebSocket address</h4>
+          <p>
+            The panel shows the address and port allocated to you. Remember that the port
+            players need is the one <strong>EaglerXServer's listener</strong> uses, not the
+            25565-style Java port — check <code>plugins/EaglerXServer/settings.yml</code>.
+            Free hosts often give you an extra allocation for it; add one in the panel if
+            the listener needs its own port.
+          </p>
+        </li>
+        <li>
+          <h4>Test it from Orion before telling anyone</h4>
+          <p>
+            Add the address on the <a href="#" data-goto="servers">Servers</a> tab and press
+            <strong>Test</strong>. That single click is worth more than any guide on this
+            page: it tells you whether the address actually answers, and if not, why.
+          </p>
+        </li>
+      </ol>
+
+      <div class="note warn">
+        <strong>The thing to check first: does it give you <code>wss://</code>?</strong>
+        Orion is served over HTTPS, and an HTTPS page cannot open a plain
+        <code>ws://</code> socket — so a free host that only offers unencrypted
+        <code>ws://</code> will not work here, and no setting on your side changes that.
+        Some hosts put your server behind a TLS domain, which is what you want; others do
+        not. Press <strong>Test</strong> to find out in one click rather than debugging
+        blind. If it turns out to be <code>ws://</code> only, host the server at home and
+        put a Cloudflare Tunnel in front of it instead — step 4 further down.
+      </div>
+
+      <div class="note">
+        <strong>Free means free-tier.</strong> Expect a RAM and player cap, and a server
+        that is put to sleep when nobody has played for a while — it wakes when someone
+        connects, so the first join after a quiet spell can be slow. Fine for friends;
+        look at paid hosting if you end up running something busy.
       </div>
     </div>
 
@@ -489,7 +661,10 @@ orion/client/assets.epk      <span class="c"># only for a split build</span></pr
   <footer class="foot">
     <p>
       <strong>Orion Client</strong> — a launcher shell for EaglercraftX 1.8, built to run on GitHub Pages.
-      Server list is stored in this browser; nothing is sent anywhere.
+      Your servers, relays and settings live in this browser and are never uploaded. The only
+      thing that leaves your device is what you deliberately publish to the
+      <a href="#" data-goto="players">Players</a> list — the name you type there, and a world
+      code if you choose to host — which stays listed only while Orion is open.
     </p>
     <p>
       Eaglercraft and EaglerXServer are the work of
@@ -501,8 +676,10 @@ orion/client/assets.epk      <span class="c"># only for a split build</span></pr
 
 </div>
 
+<script src="js/config.js"></script>
 <script src="js/servers.js"></script>
 <script src="js/relays.js"></script>
+<script src="js/lobby.js"></script>
 <script src="js/launch.js"></script>
 <script src="js/app.js"></script>
 </body>

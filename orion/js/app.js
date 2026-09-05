@@ -85,6 +85,7 @@
     }
     if (view === 'setup') refreshSetup();
     if (view === 'friends') renderRelays();
+    if (view === 'players') { renderLobby(); pollLobby(); }
     scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -599,6 +600,273 @@
     );
   });
 
+  /* ============================== lobby ============================== */
+  const Lb = O.Lobby;
+
+  /* Hide the tab entirely when no backend is configured, rather than showing a
+   * section that cannot work. */
+  if (!Lb.available()) {
+    const tab = document.querySelector('nav.tabs button[data-view="players"]');
+    if (tab) tab.style.display = 'none';
+  }
+
+  let pollTimer = null;
+
+  function renderLobby() {
+    const on = Lb.isOnline();
+    const me = Lb.me();
+    $('#lobby-off').style.display = on ? 'none' : '';
+    $('#lobby-on').style.display = on ? '' : 'none';
+    $('#host-card').style.display = on ? '' : 'none';
+    $('#requests-card').style.display = on ? '' : 'none';
+    $('#players-card').style.display = on ? '' : 'none';
+    if (on) {
+      $('#lobby-status').innerHTML =
+        'You are listed as <strong>' + esc(me.username) + '</strong>' +
+        (me.code
+          ? ' — hosting <strong>' + esc(me.world || 'a world') + '</strong>' +
+            (me.open ? ' <span class="pill ok">open to anyone</span>' : ' <span class="pill">ask first</span>')
+          : ' — not hosting anything right now') + '.';
+      $('#f-world-name').value = me.world || '';
+      $('#f-world-code').value = me.code || '';
+      $('#f-world-open').checked = !!me.open;
+    } else {
+      $('#f-lobby-name').value = me.username || '';
+    }
+  }
+
+  function statusPill(p) {
+    if (p.status === 'hosting') return '<span class="pill ok">hosting</span>';
+    if (p.status === 'playing') return '<span class="pill">playing</span>';
+    return '<span class="pill">idle</span>';
+  }
+
+  async function refreshPlayers() {
+    let rows;
+    try {
+      rows = await Lb.players();
+    } catch (e) {
+      notice('players-notice', 'bad', 'Could not reach the lobby: ' + esc(e.message));
+      return;
+    }
+    notice('players-notice', '', '');
+    $('#players-count').textContent = String(rows.length);
+
+    const others = rows.filter((r) => !r.isMe);
+    if (!others.length) {
+      $('#players-list').innerHTML =
+        '<div class="empty"><p>Nobody else is online right now. ' +
+        'Leave this tab open — you will appear to anyone who joins, and they to you.</p></div>';
+      return;
+    }
+
+    $('#players-list').innerHTML = others
+      .map(function (p) {
+        const hosting = p.status === 'hosting' && p.has_code;
+        return (
+          '<div class="srv" data-session="' + esc(p.session_id) + '">' +
+          '<div class="dot ' + (hosting ? 'ok' : '') + '"></div>' +
+          '<div>' +
+          '<div class="srv-name">' + esc(p.username) + ' ' + statusPill(p) + '</div>' +
+          '<div class="srv-meta">' +
+          (hosting
+            ? 'Hosting ' + (p.world_name ? '<strong>' + esc(p.world_name) + '</strong>' : 'a world') +
+              (p.open_join ? ' · <span class="ok">open to anyone</span>' : ' · asks first')
+            : '<span class="muted">Not hosting a world</span>') +
+          '</div></div>' +
+          '<div class="srv-acts">' +
+          (hosting && p.open_join && p.join_code
+            ? '<button class="btn slim primary" data-act="copy" data-code="' + esc(p.join_code) + '">Copy join code</button>'
+            : hosting
+              ? '<button class="btn slim primary" data-act="ask">Ask to join</button>'
+              : '<button class="btn slim" disabled title="They are not hosting a world">Ask to join</button>') +
+          '</div></div>'
+        );
+      })
+      .join('');
+  }
+
+  async function refreshRequests() {
+    let rows;
+    try {
+      rows = await Lb.inbox();
+    } catch (e) {
+      notice('req-notice', 'bad', 'Could not read your requests: ' + esc(e.message));
+      return;
+    }
+    const live = rows.filter((r) => r.state !== 'cancelled');
+    $('#req-count').textContent = String(live.filter((r) => r.state === 'pending').length);
+
+    if (!live.length) {
+      $('#req-list').innerHTML =
+        '<div class="empty"><p>No requests. Ask someone who is hosting, or wait for someone to ask you.</p></div>';
+      return;
+    }
+
+    $('#req-list').innerHTML = live
+      .map(function (r) {
+        const incoming = r.direction === 'incoming';
+        let meta, acts = '';
+        if (r.state === 'pending') {
+          meta = incoming
+            ? '<strong>' + esc(r.other_name) + '</strong> wants to join your world'
+            : 'Waiting for <strong>' + esc(r.other_name) + '</strong> to answer';
+          acts = incoming
+            ? '<button class="btn slim primary" data-act="accept">Let them in</button>' +
+              '<button class="btn slim ghost danger" data-act="decline">No thanks</button>'
+            : '<button class="btn slim ghost" data-act="withdraw">Withdraw</button>';
+        } else if (r.state === 'accepted') {
+          meta = incoming
+            ? 'You let <strong>' + esc(r.other_name) + '</strong> in'
+            : '<strong>' + esc(r.other_name) + '</strong> let you in';
+          acts = r.join_code && !incoming
+            ? '<button class="btn slim primary" data-act="copy" data-code="' + esc(r.join_code) + '">Copy join code</button>'
+            : '';
+        } else {
+          meta = incoming
+            ? 'You declined <strong>' + esc(r.other_name) + '</strong>'
+            : '<strong>' + esc(r.other_name) + '</strong> declined';
+        }
+        const cls = r.state === 'accepted' ? 'ok' : r.state === 'declined' ? 'bad' : 'busy';
+        return (
+          '<div class="srv" data-id="' + esc(r.id) + '">' +
+          '<div class="dot ' + cls + '"></div>' +
+          '<div><div class="srv-name">' + (incoming ? 'Request from ' : 'Your request to ') + esc(r.other_name) + '</div>' +
+          '<div class="srv-meta">' + meta + '</div>' +
+          (r.state === 'accepted' && r.join_code && !incoming
+            ? '<div class="srv-addr">Code: ' + esc(r.join_code) + '</div>'
+            : '') +
+          '</div><div class="srv-acts">' + acts + '</div></div>'
+        );
+      })
+      .join('');
+  }
+
+  async function pollLobby() {
+    if (!Lb.available()) return;
+    await refreshPlayers();
+    if (Lb.isOnline()) await refreshRequests();
+    if (pollTimer) clearTimeout(pollTimer);
+    /* Only poll while this tab is the one being looked at. */
+    if ($('#v-players').classList.contains('on') && !document.hidden) {
+      pollTimer = setTimeout(pollLobby, (O.config.lobby.pollMs) || 5000);
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && $('#v-players').classList.contains('on')) pollLobby();
+  });
+
+  $('#btn-go-online').addEventListener('click', async function () {
+    const err = $('#lobby-error');
+    this.disabled = true;
+    const res = await Lb.goOnline($('#f-lobby-name').value);
+    this.disabled = false;
+    if (!res.ok) {
+      err.textContent = res.error;
+      err.classList.remove('hide');
+      return;
+    }
+    err.classList.add('hide');
+    renderLobby();
+    pollLobby();
+  });
+
+  $('#btn-go-offline').addEventListener('click', async function () {
+    this.disabled = true;
+    await Lb.goOffline();
+    this.disabled = false;
+    if (pollTimer) clearTimeout(pollTimer);
+    renderLobby();
+    refreshPlayers();
+  });
+
+  $('#btn-refresh-players').addEventListener('click', () => pollLobby());
+
+  $('#btn-save-world').addEventListener('click', async function () {
+    const err = $('#world-error');
+    const code = $('#f-world-code').value.trim();
+    if (!code) {
+      err.textContent = 'Paste the join code the game gave you, or press Stop hosting.';
+      err.classList.remove('hide');
+      return;
+    }
+    err.classList.add('hide');
+    const res = await Lb.setActivity({
+      world: $('#f-world-name').value.trim(),
+      code: code,
+      open: $('#f-world-open').checked,
+      status: 'hosting'
+    });
+    if (!res.ok) {
+      err.textContent = res.error;
+      err.classList.remove('hide');
+      return;
+    }
+    renderLobby();
+    pollLobby();
+  });
+
+  $('#btn-clear-world').addEventListener('click', async function () {
+    await Lb.setActivity({ world: '', code: '', open: false, status: 'idle' });
+    renderLobby();
+    pollLobby();
+  });
+
+  $('#players-list').addEventListener('click', async function (ev) {
+    const btn = ev.target.closest('button[data-act]');
+    if (!btn) return;
+    const card = btn.closest('.srv');
+
+    if (btn.dataset.act === 'copy') {
+      await copyCode(btn.dataset.code, 'players-notice');
+      return;
+    }
+    if (btn.dataset.act === 'ask') {
+      btn.disabled = true;
+      const res = await Lb.ask(card.dataset.session);
+      btn.disabled = false;
+      notice('players-notice', res.ok ? 'ok' : 'bad',
+        res.ok
+          ? 'Asked to join. Watch the <strong>Requests</strong> section above for their answer.'
+          : esc(res.error));
+      if (res.ok) refreshRequests();
+    }
+  });
+
+  $('#req-list').addEventListener('click', async function (ev) {
+    const btn = ev.target.closest('button[data-act]');
+    if (!btn) return;
+    const id = btn.closest('.srv').dataset.id;
+    const act = btn.dataset.act;
+
+    if (act === 'copy') {
+      await copyCode(btn.dataset.code, 'req-notice');
+      return;
+    }
+    btn.disabled = true;
+    let res;
+    if (act === 'accept') res = await Lb.respond(id, true);
+    else if (act === 'decline') res = await Lb.respond(id, false);
+    else res = await Lb.cancel(id);
+    btn.disabled = false;
+    if (!res.ok) notice('req-notice', 'bad', esc(res.error));
+    else if (act === 'accept') notice('req-notice', 'ok', 'They can see your join code now.');
+    else notice('req-notice', '', '');
+    refreshRequests();
+  });
+
+  async function copyCode(code, where) {
+    try {
+      await navigator.clipboard.writeText(code);
+      notice(where, 'ok',
+        '<strong>Join code copied.</strong> In the game: Multiplayer, then paste it into the join-code box. ' +
+        'The world may also just appear in the list by itself.');
+    } catch (e) {
+      notice(where, 'ok', '<strong>Join code:</strong> <span class="mono">' + esc(code) + '</span>');
+    }
+  }
+
   /* ============================== launching ============================== */
   async function launch(entry) {
     const p = probeCache || (await L.probe());
@@ -626,6 +894,8 @@
       await L.launch('game_frame', entry ? entry.addr : null, p);
       $('#game-shell').classList.add('on');
       $('#game-exit').style.display = '';
+      watchPointerLock();
+      if (Lb.isOnline()) Lb.setActivity({ status: Lb.me().code ? 'hosting' : 'playing' });
       O.stopStars && O.stopStars();
       /* The client paints over the boot screen itself; drop it once the
        * canvas has had a frame to appear. */
@@ -640,14 +910,33 @@
     }
   }
 
+  /* The exit button should only be reachable from the game's menus, never
+   * hovering over the world while you play. Minecraft grabs the mouse pointer
+   * while you are in a world and releases it for every menu, including the
+   * pause menu that Esc opens — so pointer lock is exactly the signal we
+   * want, and it needs no knowledge of the game's internals. */
+  function watchPointerLock() {
+    const btn = $('#game-exit');
+    const sync = () => {
+      const inWorld = !!document.pointerLockElement;
+      btn.style.display = inWorld ? 'none' : '';
+    };
+    document.addEventListener('pointerlockchange', sync);
+    document.addEventListener('pointerlockerror', sync);
+    sync();
+  }
+
   $('#btn-launch').addEventListener('click', () => launch(null));
   $('#btn-launch-2').addEventListener('click', () => launch(null));
   $('#btn-goto-friends').addEventListener('click', () => show('friends'));
   $('#btn-goto-servers').addEventListener('click', () => show('servers'));
-  $('#game-exit').addEventListener('click', () => {
-    if (confirm('Leave the game and go back to the launcher? Anything unsaved in a singleplayer world may be lost.')) {
-      location.reload();
+  $('#game-exit').addEventListener('click', async () => {
+    if (!confirm('Leave the game and go back to the launcher? Anything unsaved in a singleplayer world may be lost.')) return;
+    /* Stop advertising a world that is about to stop existing. */
+    if (Lb.isOnline()) {
+      try { await Lb.setActivity({ status: 'idle', world: '', code: '', open: false }); } catch (e) { /* reloading anyway */ }
     }
+    location.reload();
   });
 
   /* ============================== boot ============================== */
@@ -668,7 +957,7 @@
     show('servers');
   } else {
     const h = (location.hash || '').replace('#', '');
-    show(['play', 'servers', 'friends', 'host', 'setup'].includes(h) ? h : 'play');
+    show(['play', 'servers', 'players', 'friends', 'host', 'setup'].includes(h) ? h : 'play');
   }
 
   refreshBundle();

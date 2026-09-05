@@ -65,11 +65,12 @@ header.top {
 
 nav.tabs { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 nav.tabs button {
-  font-family: var(--font); font-size: 14.5px; font-weight: 600;
-  letter-spacing: 0.10em; text-transform: uppercase;
+  font-family: var(--font); font-size: 14px; font-weight: 600;
+  letter-spacing: 0.07em; text-transform: uppercase;
   color: var(--txt2); background: transparent;
   border: 1px solid transparent; border-radius: 999px;
-  padding: 9px 17px; cursor: pointer; transition: all .16s ease;
+  padding: 9px 13px; cursor: pointer; transition: all .16s ease;
+  white-space: nowrap;
 }
 nav.tabs button:hover { color: var(--txt); background: rgba(140, 130, 220, 0.10); }
 nav.tabs button[aria-selected="true"] {
