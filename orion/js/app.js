@@ -98,14 +98,13 @@
     }
   });
 
-  /* ============================== bundle state ============================== */
-  let probeCache = null;
+  /* ============================== versions ============================== */
+  const Vs = O.Versions;
+  let probeCache = null;      // probe of the selected version
+  let probeAll = null;        // probe of every version, for the picker
 
   /* Two buttons launch the client — the hero and the play-together card — so
    * they are enabled and disabled together. */
-  const fmtSize = (n) =>
-    n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
-
   function setLaunchEnabled(on) {
     ['#btn-launch', '#btn-launch-2'].forEach((sel) => {
       const b = $(sel);
@@ -113,30 +112,65 @@
     });
   }
 
+  const fmtSize = (n) =>
+    n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : n + ' B';
+
+  function renderVersionPicker() {
+    const box = $('#version-pick');
+    if (!box) return;
+    const sel = Vs.selected();
+
+    box.innerHTML =
+      '<div style="font-size:12.5px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--txt3);margin-bottom:9px">Version</div>' +
+      '<div class="ver-row">' +
+      Vs.all().map(function (v) {
+        const p = probeAll && probeAll[v.id];
+        const bad = p && !p.ready;
+        return (
+          '<button class="ver' + (v.id === sel.id ? ' on' : '') + (bad ? ' bad' : '') + '"' +
+          ' data-ver="' + esc(v.id) + '"' +
+          (bad ? ' title="Not installed"' : '') + '>' +
+          '<span class="ver-num">' + esc(v.label) + '</span>' +
+          '<span class="ver-note">' + esc(v.note) + (bad ? ' · not installed' : '') + '</span>' +
+          '</button>'
+        );
+      }).join('') +
+      '</div>';
+  }
+
+  $('#version-pick').addEventListener('click', async function (ev) {
+    const btn = ev.target.closest('button[data-ver]');
+    if (!btn) return;
+    if (L.hasLaunched()) return;
+    Vs.select(btn.dataset.ver);
+    renderVersionPicker();
+    await refreshBundle();
+  });
+
   async function refreshBundle() {
     const play = $('#bundle-state');
-    play.innerHTML = '<div class="note">Looking for the client bundle…</div>';
+    play.innerHTML = '<div class="note">Looking for the client…</div>';
     setLaunchEnabled(false);
 
-    const p = await L.probe();
+    probeAll = await L.probeAll();
+    const v = Vs.selected();
+    const p = probeAll[v.id];
     probeCache = p;
+    renderVersionPicker();
 
     if (p.ready) {
       play.innerHTML =
-        '<div class="note ok"><strong>Client ready.</strong> ' +
-        (p.selfContained
-          ? 'Self-contained build — assets are compiled into the bundle.'
-          : 'Split build — assets load from <code>' + esc(L.assetsURL()) + '</code>.') +
-        (p.signature && p.signature.ok ? ' Signed build — Orion will pass the signature through.' : '') +
+        '<div class="note ok"><strong>' + esc(v.label) + ' ready.</strong> ' +
+        esc(fmtSize(p.totalBytes)) + ' to download on first launch, then cached by your browser.' +
+        (p.signature && p.signature.ok ? ' Signed build — the signature is passed through.' : '') +
         '</div>';
       setLaunchEnabled(true);
     } else {
       play.innerHTML =
-        '<div class="note warn"><strong>No client bundle installed yet.</strong> ' +
-        'Orion could not find <code>classes.js</code>' +
+        '<div class="note warn"><strong>' + esc(v.label) + ' is not installed.</strong> ' +
+        'Orion could not find ' + p.missing.map((m) => '<code>' + esc(m) + '</code>').join(' or ') +
         ' in <code>' + esc(p.base) + '</code>. ' +
-        'Everything else works — you can build your server list now. ' +
-        '<a href="#" data-goto="setup">Set up the client →</a></div>';
+        '<a href="#" data-goto="setup">Set it up →</a></div>';
       setLaunchEnabled(false);
     }
     renderQuickJoin();
@@ -144,41 +178,47 @@
   }
 
   async function refreshSetup() {
-    $('#f-base').value = L.base();
-    $('#opts-preview').textContent = JSON.stringify(L.buildOpts('game_frame', null, probeCache), null, 2);
+    $('#f-base').value = L.root();
+    const v = Vs.selected();
+    $('#opts-preview').textContent = JSON.stringify(L.buildOpts(v, 'game_frame', null), null, 2);
 
     const box = $('#setup-state');
     box.innerHTML = '<div class="note">Checking…</div>';
-    const p = probeCache || (await L.probe());
-    const row = (label, r, url, optional) =>
-      '<tr><td>' + esc(label) + '</td><td>' +
-      (r.ok
-        ? '<span class="pill ok">found</span>' + (r.size ? ' <span class="muted">' + fmtSize(r.size) + '</span>' : '')
-        : optional
-          ? '<span class="pill">not needed</span>'
-          : '<span class="pill bad">missing</span>' + (r.status ? ' <span class="muted">HTTP ' + r.status + '</span>' : '')) +
-      '</td><td class="mono muted">' + esc(url) + '</td></tr>';
+    probeAll = probeAll || (await L.probeAll());
 
-    box.innerHTML =
-      (p.ready
-        ? '<div class="note ok"><strong>Ready to launch.</strong> ' +
-          (p.selfContained
-            ? 'This is a self-contained build: the asset packages are compiled into <code>classes.js</code>, so no <code>assets.epk</code> is required and Orion does not ask for one.'
-            : 'This is a split build, loading assets from <code>assets.epk</code>.') +
-          '</div>'
-        : '<div class="note warn"><strong>Not launchable yet.</strong> Install a bundle below.</div>') +
-      '<table class="tbl"><thead><tr><th>File</th><th>Status</th><th>URL</th></tr></thead><tbody>' +
-      row('classes.js', p.classes, L.classesURL(), false) +
-      row('assets.epk', p.assets, L.assetsURL(), p.classes.ok) +
-      row('signature.txt', p.signature, L.signatureURL(), true) +
-      '</tbody></table>' +
-      (p.signature && p.signature.ok
-        ? '<p class="muted">A detached signature is present, so the client can verify itself: the main menu will read <strong>Digitally Signed</strong>. Without it a signed bundle shows <strong>Signature Invalid!</strong> instead — harmless, but alarming.</p>'
-        : '<p class="muted">No <code>signature.txt</code>. If your bundle came from a signed build, save its signature here so the client can verify itself; otherwise the main menu reads <strong>Signature Invalid!</strong>.</p>');
+    box.innerHTML = Vs.all().map(function (ver) {
+      const p = probeAll[ver.id];
+      const rows = ver.scripts.map(function (name) {
+        const r = p.scripts[name];
+        return '<tr><td>' + esc(name) + '</td><td>' +
+          (r.ok
+            ? '<span class="pill ok">found</span>' + (r.size ? ' <span class="muted">' + fmtSize(r.size) + '</span>' : '')
+            : '<span class="pill bad">missing</span>' + (r.status ? ' <span class="muted">HTTP ' + r.status + '</span>' : '')) +
+          '</td><td class="mono muted">' + esc(L.scriptURL(ver, name)) + '</td></tr>';
+      });
+      if (ver.signature) {
+        const sr = p.signature || { ok: false };
+        rows.push('<tr><td>' + esc(ver.signature) + '</td><td>' +
+          (sr.ok ? '<span class="pill ok">found</span>' : '<span class="pill">optional</span>') +
+          '</td><td class="mono muted">' + esc(L.signatureURL(ver)) + '</td></tr>');
+      }
+      return '<h3 style="margin-top:18px">' + esc(ver.label) +
+        (ver.isDefault ? ' <span class="pill ok">default</span>' : '') +
+        (Vs.selected().id === ver.id ? ' <span class="pill">selected</span>' : '') + '</h3>' +
+        '<p class="muted">' + esc(ver.note) + ' · options passed as <code>' +
+        (ver.optsMode === 'hints' ? 'eaglercraftXOptsHints' : 'eaglercraftXOpts') + '</code> · ' +
+        (ver.autoStart ? 'starts itself' : 'started by Orion calling <code>main()</code>') +
+        ' · worlds in <code>' + esc(ver.worldsDB) + '</code></p>' +
+        (p.ready
+          ? '<div class="note ok">Ready to launch — ' + esc(fmtSize(p.totalBytes)) + ' total.</div>'
+          : '<div class="note warn">Not launchable: missing ' + p.missing.map(esc).join(', ') + '.</div>') +
+        '<table class="tbl"><thead><tr><th>File</th><th>Status</th><th>URL</th></tr></thead><tbody>' +
+        rows.join('') + '</tbody></table>';
+    }).join('');
   }
 
   $('#btn-base-save').addEventListener('click', async () => {
-    const res = L.setBase($('#f-base').value);
+    const res = L.setRoot($('#f-base').value);
     const err = $('#base-error');
     if (!res.ok) {
       err.textContent = res.error;
@@ -192,7 +232,7 @@
   });
 
   $('#btn-base-reset').addEventListener('click', async () => {
-    L.setBase('');
+    L.setRoot('');
     $('#base-error').classList.add('hide');
     probeCache = null;
     await refreshBundle();
@@ -950,8 +990,9 @@
       return;
     }
 
-    $('#boot-msg').textContent = entry ? 'Joining ' + entry.name : 'Starting Orion';
-    $('#boot-sub').textContent = entry ? entry.addr : 'Loading EaglercraftX 1.8';
+    const bootVer = Vs.selected();
+    $('#boot-msg').textContent = entry ? 'Joining ' + entry.name : 'Starting Minecraft ' + bootVer.label;
+    $('#boot-sub').textContent = entry ? entry.addr : 'Loading Eaglercraft ' + bootVer.label;
     $('#boot').classList.add('on');
     $('#shell').style.display = 'none';
 
@@ -963,14 +1004,15 @@
       try {
         await Tn.prepare();
       } catch (e) { /* shared worlds simply stay as they were */ }
-      $('#boot-sub').textContent = entry ? entry.addr : 'Loading EaglercraftX 1.8';
+      $('#boot-sub').textContent = entry ? entry.addr : 'Loading Eaglercraft ' + bootVer.label;
     }
 
     try {
-      await L.launch('game_frame', entry ? entry.addr : null, p);
+      await L.launch('game_frame', entry ? entry.addr : null, Vs.selected());
       $('#game-shell').classList.add('on');
       $('#game-exit').style.display = '';
       watchPointerLock();
+      renderVersionPicker();
       const ts = Tn.state();
       if (ts.installed && ts.count) {
         console.info('[Orion] ' + ts.count + ' ICE server(s) applied to the game (' + ts.mode + ')');

@@ -36,7 +36,7 @@
       <img src="assets/orion-logo.svg" alt="Orion Client logo">
       <div>
         <h1>Orion<span>&nbsp;Client</span></h1>
-        <div class="tag">Eaglercraft 1.8 · Browser</div>
+        <div class="tag">Eaglercraft · Browser</div>
       </div>
     </a>
     <nav class="tabs" role="tablist" aria-label="Sections">
@@ -53,13 +53,15 @@
   <section class="view on" id="v-play" role="tabpanel">
     <div class="card hero">
       <div>
-        <h2>Minecraft 1.8, no install</h2>
+        <h2>Minecraft in your browser</h2>
         <p class="lede">
-          Orion runs <strong>EaglercraftX 1.8</strong> — a full port of Minecraft 1.8 to
-          WebGL and JavaScript — straight in the browser. Add a server address once and
-          it stays in your list, on this device, ready to join in one click.
+          Orion runs <strong>Eaglercraft</strong> — a full port of Minecraft to WebGL and
+          JavaScript — straight in the browser, in either <strong>1.8.9</strong> or
+          <strong>1.12.2</strong>. Add a server address once and it stays in your list,
+          on this device, ready to join in one click.
         </p>
-        <div class="btn-row" style="margin-top:20px">
+        <div id="version-pick" style="margin-top:22px"></div>
+        <div class="btn-row" style="margin-top:16px">
           <button class="btn primary big" id="btn-launch">▶ Launch client</button>
           <button class="btn big ghost" id="btn-goto-servers">Manage servers</button>
         </div>
@@ -74,8 +76,8 @@
       <h3>Play with a friend — nothing to set up</h3>
       <p>
         You do not need a server to play together. Launch the client, make a
-        singleplayer world, share it, and the client hands you a short code your
-        friend types in. <a href="#" data-goto="friends">How it works →</a>
+        singleplayer world, open it to other players, and your friends see it appear in
+        their own list. <a href="#" data-goto="friends">How it works →</a>
       </p>
       <div class="btn-row">
         <button class="btn primary" id="btn-launch-2">▶ Launch client</button>
@@ -313,16 +315,24 @@
 
     <div class="card">
       <h3>What to expect the very first time</h3>
-      <p>The client asks three quick questions before you reach the menu. This is normal and only happens once:</p>
+      <p>The client asks a few things before you reach the menu. Normal, and only once per version:</p>
       <table class="tbl">
-        <thead><tr><th>Screen</th><th>What to do</th></tr></thead>
+        <thead><tr><th>Screen</th><th>Seen on</th><th>What to do</th></tr></thead>
         <tbody>
-          <tr><td>Content Warning</td><td>Turn the profanity filter on or off, then <strong>Done</strong>.</td></tr>
-          <tr><td>Edit Profile</td><td>Pick your username and skin, then <strong>Done</strong>. This is the name other players see.</td></tr>
-          <tr><td>Default Username Detected</td><td>It warns that the auto-generated name may be taken. <strong>Change Username</strong>, or <strong>Continue Anyway</strong>.</td></tr>
+          <tr><td>Content Warning</td><td>1.8</td><td>Turn the profanity filter on or off, then <strong>Done</strong>.</td></tr>
+          <tr><td>Edit Profile</td><td>both</td><td>Pick your username and skin, then <strong>Done</strong>. This is the name other players see.</td></tr>
+          <tr><td>Default Username Detected</td><td>1.8</td><td>Warns the auto-generated name may be taken. <strong>Change Username</strong>, or <strong>Continue Anyway</strong>.</td></tr>
+          <tr><td>Important Disclaimer</td><td>1.12.2</td><td>Its author's own warning that 1.12 is early and buggy. <strong>I Understand</strong>.</td></tr>
         </tbody>
       </table>
-      <p class="muted">After that, launching goes straight to the Minecraft main menu.</p>
+      <div class="note warn">
+        <strong>Shared worlds differ slightly between versions.</strong> Both can open a
+        world to other players, and both discover worlds through a relay. But 1.8 can
+        also <em>show a join code</em> to hand out by hand, and 1.12.2 cannot — on
+        1.12.2 the other player has to see your world appear in their list. Host and
+        joiner also need the <strong>same version</strong>: 1.8 cannot join a 1.12.2
+        world or the reverse.
+      </div>
     </div>
 
     <div class="card">
@@ -591,9 +601,9 @@ play.example.net {
       <h2>Client setup</h2>
       <p class="lede">
         Orion is the launcher — the menu, the server book, the launch button. The game
-        itself is the EaglercraftX 1.8 bundle, and a build is already installed here, so
-        there is nothing to set up. This tab is for checking that install, or pointing
-        Orion at a different one.
+        itself is an Eaglercraft build, and two are already installed here, so there is
+        nothing to set up. This tab is for checking those installs, or pointing Orion
+        somewhere else.
       </p>
       <div id="setup-state"></div>
     </div>
@@ -601,55 +611,59 @@ play.example.net {
     <div class="card">
       <h3>Where Orion looks</h3>
       <p>
-        Orion loads the bundle from the location below — either a folder in this
-        repository, or any HTTPS URL. <code>classes.js</code> is the compiled game and is
-        the only required file. Some builds keep their textures and sounds in a separate
-        <code>assets.epk</code>; the build installed here has them compiled in, so there
-        is nothing else to fetch. A signed build also has a small
-        <code>signature.txt</code> beside it.
+        Each version lives in its own folder under the location below — so
+        <code>client/1.8/</code> and <code>client/1.12.2/</code>. Leave it empty to load
+        from this site, which is the normal case, or give an HTTPS URL to host the
+        (large) client files elsewhere.
       </p>
       <label class="field">
-        <span>Bundle location</span>
-        <input type="text" id="f-base" placeholder="client/" spellcheck="false">
+        <span>Client location — leave empty for this site</span>
+        <input type="text" id="f-base" placeholder="(this site)" spellcheck="false">
       </label>
       <div id="base-error" class="note bad hide"></div>
       <div class="btn-row">
         <button class="btn primary" id="btn-base-save">Save &amp; test</button>
-        <button class="btn ghost" id="btn-base-reset">Reset to client/</button>
+        <button class="btn ghost" id="btn-base-reset">Reset to this site</button>
       </div>
       <p class="muted" style="margin-top:14px">
-        Serving from another origin needs CORS headers on that host. A folder inside this
-        site never does, which is why <code>client/</code> is the default.
+        Serving from another origin needs <code>Access-Control-Allow-Origin</code> on that
+        host. Loading from this site never does, which is why it is the default.
       </p>
     </div>
 
     <div class="card">
-      <h3>Replacing the bundle</h3>
+      <h3>Adding or replacing a version</h3>
       <ol class="steps">
         <li>
-          <h4>Get the build you want</h4>
+          <h4>Get an offline build</h4>
           <p>
-            An EaglercraftX 1.8 offline build. If it is a single signed
-            <code>.html</code> file, the game and its assets are base64'd inside it —
-            unpack the client bundle out of it rather than committing the page.
+            An Eaglercraft <em>offline</em> build is one self-contained
+            <code>.html</code> file. Orion cannot load that file as it stands: the page
+            sets its own launch options, so your server list and join-on-launch would be
+            discarded, and its boot code waits for a page event that has already fired.
           </p>
         </li>
         <li>
-          <h4>Commit it over the current one</h4>
-          <pre class="code">orion/client/classes.js      <span class="c"># required</span>
-orion/client/signature.txt   <span class="c"># if the build is signed</span>
-orion/client/assets.epk      <span class="c"># only for a split build</span></pre>
+          <h4>Unpack it</h4>
+          <pre class="code">node tools/unpack-eaglercraft.js Eaglercraft_1.12.2_u3_Offline.html orion/client/1.12.2</pre>
           <p>
-            <code>classes.js</code> is around 34&nbsp;MB. That is inside GitHub's
-            100&nbsp;MB hard limit but past its 50&nbsp;MB warning, so pushes will
-            mention it. Pages compresses JavaScript in transit, so players download
-            roughly a third of that. If a build ever exceeds 100&nbsp;MB, host it
-            elsewhere and paste the URL above.
+            The tool handles both shapes in circulation — a signed build with its client
+            gzipped into a <code>&lt;style&gt;</code> element, and an unsigned one with the
+            client inline as a script — and prints the settings the new version needs.
+          </p>
+        </li>
+        <li>
+          <h4>Declare it</h4>
+          <p>
+            Add an entry to <code>orion/js/versions.js</code> with the folder, the scripts
+            to load in order, and the two settings the tool printed:
+            <code>optsMode</code> and <code>autoStart</code>. Those describe how the build
+            wants its options and whether it starts itself.
           </p>
         </li>
         <li>
           <h4>Push</h4>
-          <p>Pages redeploys, and this tab will report what it found.</p>
+          <p>Pages redeploys and the version appears in the picker. Files over 100&nbsp;MB are rejected by GitHub — host those elsewhere and set the location above.</p>
         </li>
       </ol>
     </div>
@@ -657,18 +671,19 @@ orion/client/assets.epk      <span class="c"># only for a split build</span></pr
     <div class="card">
       <h3>What Orion hands the client</h3>
       <p>
-        On launch, Orion writes this to <code>window.eaglercraftXOptsHints</code> before
-        the bundle evaluates — seeding the in-game multiplayer list from your server book,
-        passing your relays through, and setting <code>joinServer</code> when you launched
-        into a specific server.
+        On launch, Orion writes this before the client evaluates — seeding the in-game
+        multiplayer list from your server book, passing your relays through, and setting
+        <code>joinServer</code> when you launched into a specific server. Shown for the
+        version currently selected.
       </p>
       <div class="note">
-        <strong>Why hints and not <code>eaglercraftXOpts</code>?</strong> A modern bundle
-        adopts <code>eaglercraftXOptsHints</code> when <code>hintsVersion</code> is 1, and
+        <strong>Why two globals?</strong> The 1.8 build adopts
+        <code>eaglercraftXOptsHints</code> when <code>hintsVersion</code> is 1, and
         otherwise <em>replaces</em> <code>eaglercraftXOpts</code> with its own defaults —
-        so settings written only to <code>eaglercraftXOpts</code> are discarded a moment
-        later. Orion sets both from the same object, so older bundles that read
-        <code>eaglercraftXOpts</code> directly still work.
+        so settings written only to the latter are discarded a moment later. The 1.12.2
+        build is the other way round: it reads <code>eaglercraftXOpts</code> and adds its
+        assets to it. Orion sets both from one object, so neither build can be given a
+        stale copy.
       </div>
       <pre class="code" id="opts-preview">…</pre>
       <p class="muted">
@@ -680,7 +695,7 @@ orion/client/assets.epk      <span class="c"># only for a split build</span></pr
 
   <footer class="foot">
     <p>
-      <strong>Orion Client</strong> — a launcher shell for EaglercraftX 1.8, built to run on GitHub Pages.
+      <strong>Orion Client</strong> — a launcher shell for Eaglercraft, built to run on GitHub Pages.
       Your servers, relays and settings live in this browser and are never uploaded. The only
       thing that leaves your device is what you deliberately publish to the
       <a href="#" data-goto="players">Players</a> list — the name you type there, and a world
@@ -689,14 +704,16 @@ orion/client/assets.epk      <span class="c"># only for a split build</span></pr
     <p>
       Eaglercraft and EaglerXServer are the work of
       <a href="https://github.com/lax1dude" target="_blank" rel="noopener">lax1dude</a>;
-      the installed client is their EaglercraftX 1.8-u53 build, unmodified. Orion is the
-      launcher around it, and is not affiliated with Mojang or Microsoft.
+      and the installed clients are their EaglercraftX 1.8-u53 and Eaglercraft 1.12.2-u3
+      builds, unmodified. Orion is the launcher around them, and is not affiliated with
+      Mojang or Microsoft.
     </p>
   </footer>
 
 </div>
 
 <script src="js/config.js"></script>
+<script src="js/versions.js"></script>
 <script src="js/servers.js"></script>
 <script src="js/relays.js"></script>
 <script src="js/lobby.js"></script>

@@ -97,12 +97,17 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
   EaglerXServer on it, including the `wss://` requirement that decides whether
   it will work at all.
 
-An **EaglercraftX 1.8-u53** build is installed in
-[`orion/client/`](orion/client/README.md), so the client runs as shipped. That
-directory's README documents the bundle contract — why settings go through
-`eaglercraftXOptsHints` rather than `eaglercraftXOpts`, why there is no
-`assets.epk`, and why `signature.txt` has to be handed over before the bundle
-loads.
+- **Two versions** — **1.8.9** (EaglercraftX 1.8-u53, signed) and **1.12.2**
+  (Eaglercraft 1.12.2-u3). Pick one on the Play tab; the choice is remembered.
+  1.8 is the default because 1.12.2's own first-run screen calls itself early
+  and buggy.
+
+Both builds are installed in [`orion/client/`](orion/client/README.md), so the
+client runs as shipped. That directory's README documents what differs between
+them — which global carries the launch options, which one starts itself and
+which Orion has to start, and why `signature.txt` must be handed over before
+the client loads. `tools/unpack-eaglercraft.js` pulls a build out of an offline
+`.html` and prints the settings it needs.
 
 The Orion mark is generated, not stored as a bitmap:
 `node tools/make-orion-logo.js > orion/assets/orion-logo.svg`.
@@ -177,9 +182,12 @@ orion/js/launch.js    bundle discovery + eaglercraftXOpts handoff
 orion/js/app.js       launcher UI
 orion/js/relays.js    relay book: the no-server path for playing together
 orion/js/lobby.js     players list, play requests (Supabase-backed)
+orion/js/versions.js  the builds Orion can launch, and how each one boots
 orion/js/turn.js      TURN injection for shared worlds
 orion/js/config.js    lobby + TURN endpoints; blank either to disable it
-orion/client/         the EaglercraftX 1.8 bundle + its signature
+orion/client/1.8/     EaglercraftX 1.8-u53 + its signature
+orion/client/1.12.2/  Eaglercraft 1.12.2-u3
+tools/unpack-eaglercraft.js  pull a client out of an offline .html
 tools/make-orion-logo.js   rasterises the Orion mark to SVG
 ```
 

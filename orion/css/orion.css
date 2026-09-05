@@ -126,6 +126,27 @@ nav.tabs button[aria-selected="true"] {
   .steps > li { padding-left: 34px; }
 }
 
+/* ============================== version picker ============================== */
+.ver-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.ver {
+  font-family: var(--font); text-align: left; cursor: pointer;
+  background: rgba(7, 6, 15, 0.5); color: var(--txt);
+  border: 1px solid var(--line); border-radius: 10px;
+  padding: 11px 16px; min-width: 172px;
+  display: flex; flex-direction: column; gap: 2px;
+  transition: all .16s ease;
+}
+.ver:hover { border-color: var(--line2); background: rgba(106, 81, 184, 0.16); }
+.ver.on {
+  border-color: var(--lilac);
+  background: linear-gradient(135deg, rgba(106, 81, 184, 0.34), rgba(111, 127, 221, 0.20));
+  box-shadow: 0 4px 18px rgba(106, 81, 184, 0.28);
+}
+.ver.bad { opacity: 0.55; }
+.ver-num { font-size: 19px; font-weight: 700; letter-spacing: 0.03em; }
+.ver-note { font-size: 11.5px; color: var(--txt3); letter-spacing: 0.02em; }
+.ver.on .ver-note { color: var(--txt2); }
+
 /* ============================== buttons ============================== */
 .btn {
   font-family: var(--font); font-size: 15px; font-weight: 700;
