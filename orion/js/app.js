@@ -292,6 +292,7 @@
           '<div class="srv-acts">' +
           '<button class="btn slim primary" data-act="join">Join</button>' +
           '<button class="btn slim" data-act="ping">Test</button>' +
+          '<button class="btn slim" data-act="diag" title="Work out why it will not connect">Diagnose</button>' +
           '<button class="btn slim" data-act="share">Share</button>' +
           '<button class="btn slim" data-act="edit">Edit</button>' +
           '<button class="btn slim ghost" data-act="up" ' + (i === 0 ? 'disabled' : '') + ' title="Move up">↑</button>' +
@@ -340,6 +341,37 @@
       case 'join':
         launch(e);
         break;
+
+      case 'diag': {
+        btn.disabled = true;
+        const label = btn.textContent;
+        notice('srv-notice', 'warn', '<strong>Diagnosing ' + esc(e.name) + '…</strong> This runs a few connection attempts, so give it a moment.');
+        const res = await S.diagnose(e.addr, (t) => {
+          btn.textContent = '…';
+          notice('srv-notice', 'warn', '<strong>Diagnosing ' + esc(e.name) + '</strong><br>' + esc(t));
+        });
+        btn.disabled = false;
+        btn.textContent = label;
+
+        const rows = res.findings.map(function (f) {
+          const tone = f.level === 'ok' ? 'ok' : f.level === 'bad' ? 'bad' : 'warn';
+          return '<div class="note ' + tone + '" style="margin:0 0 10px">' +
+            '<strong>' + esc(f.title) + '</strong>' +
+            (f.text ? '<br>' + esc(f.text) : '') +
+            (f.list ? '<ol style="margin:8px 0 0;padding-left:20px">' +
+              f.list.map((li) => '<li style="margin:4px 0">' + esc(li) + '</li>').join('') + '</ol>' : '') +
+            '</div>';
+        }).join('');
+
+        notice('srv-notice', res.ok ? 'ok' : 'warn',
+          '<strong>' + esc(e.name) + '</strong> <span class="mono">' + esc(e.addr) + '</span>' +
+          '<div style="margin-top:12px">' + rows + '</div>' +
+          (res.suggestion
+            ? '<button class="btn slim primary" id="btn-use-suggestion" data-addr="' + esc(res.suggestion) +
+              '" data-id="' + esc(e.id) + '">Use ' + esc(res.suggestion) + '</button>'
+            : ''));
+        break;
+      }
 
       case 'ping': {
         const dot = card.querySelector('[data-dot]');
@@ -406,6 +438,19 @@
         }
         break;
     }
+  });
+
+  /* A diagnosis that found a working address offers to apply it. */
+  $('#srv-notice').addEventListener('click', function (ev) {
+    const btn = ev.target.closest('#btn-use-suggestion');
+    if (!btn) return;
+    const res = S.update(btn.dataset.id, { addr: btn.dataset.addr });
+    if (!res.ok) {
+      notice('srv-notice', 'bad', esc(res.error));
+      return;
+    }
+    renderList();
+    notice('srv-notice', 'ok', 'Address updated to <span class="mono">' + esc(btn.dataset.addr) + '</span>. Press <strong>Test</strong> to confirm.');
   });
 
   /* ============================== add / edit form ============================== */

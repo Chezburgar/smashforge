@@ -220,6 +220,127 @@ window.ORION = window.ORION || {};
     });
   };
 
+  /* A server that "does not work" is nearly always one of a handful of things,
+   * and the browser refuses to say which: a failed WebSocket reports no reason
+   * at all, by design. So instead of guessing, try the alternatives and report
+   * what actually answered. Runs several probes, so it takes a few seconds.
+   *
+   * The cases this separates, in the order they bite people:
+   *   1. a ws:// address on an HTTPS page   — blocked before it leaves the tab
+   *   2. the Java port instead of the WebSocket one — nothing is listening
+   *   3. no EaglerXServer / wrong port      — refused or silent
+   *   4. TLS only on 443                    — works, but not where you asked
+   */
+  S.diagnose = async function (input, onStep) {
+    const n = S.normalise(input);
+    const step = (t) => { try { onStep && onStep(t); } catch (e) { /* display only */ } };
+    if (!n.ok) return { addr: null, findings: [{ level: 'bad', title: 'That address cannot be read', text: n.error }] };
+
+    const url = n.addr && n.url;
+    const host = url.hostname;
+    const givenPort = url.port || (url.protocol === 'wss:' ? '443' : '80');
+    const path = url.pathname === '/' ? '/' : url.pathname;
+    const findings = [];
+    let suggestion = null;
+
+    const JAVA_PORTS = ['25565', '25566', '25567'];
+    if (JAVA_PORTS.includes(givenPort)) {
+      findings.push({
+        level: 'warn',
+        title: 'That looks like the Java port, not the WebSocket one',
+        text: 'Port ' + givenPort + ' is what the desktop game uses. Browsers need the port from ' +
+              "EaglerXServer's own listener, which is a different number — check " +
+              'plugins/EaglerXServer/settings.yml, or the extra port your host allocated for it.'
+      });
+    }
+
+    /* 1. Would the browser even let this out of the tab? */
+    if (S.isBlockedMixed(n.addr)) {
+      findings.push({
+        level: 'bad',
+        title: 'This page cannot open a ws:// address at all',
+        text: 'Orion is served over HTTPS, and every browser blocks an unencrypted ws:// socket ' +
+              'from a secure page. Nothing on the server side changes this — the address itself has to be wss://.'
+      });
+      const alt = 'wss://' + url.host + path;
+      step('Trying the same address over TLS…');
+      const r = await S.ping(alt, 7000);
+      if (r.ok) {
+        suggestion = alt;
+        findings.push({
+          level: 'ok',
+          title: 'Good news — it answers over TLS',
+          text: 'The same host and port responded in ' + r.ms + ' ms as ' + alt + '. Use that address instead.'
+        });
+      } else {
+        findings.push({
+          level: 'warn',
+          title: 'It does not answer over TLS either',
+          text: 'So the server is not offering an encrypted endpoint on that port. That is the thing to fix: ' +
+                'a browser on an HTTPS page can only reach wss://.'
+        });
+      }
+    } else {
+      /* 2. Try what they actually asked for. */
+      step('Connecting to ' + n.addr + '…');
+      const r = await S.ping(n.addr, 8000);
+      if (r.ok) {
+        findings.push({
+          level: 'ok',
+          title: 'This address works',
+          text: 'The server completed a WebSocket handshake in ' + r.ms + ' ms. If the game still will not join, ' +
+                'the problem is past the connection — check online-mode=false, and that EaglerXServer is the ' +
+                'thing listening on this port.'
+        });
+        return { addr: n.addr, findings: findings, ok: true };
+      }
+      findings.push({
+        level: 'bad',
+        title: r.code === 'timeout' ? 'Nothing answered in time' : 'The connection was refused',
+        text: r.detail
+      });
+
+      /* 3. Is there TLS on the standard port instead? Hosts that terminate TLS
+       *    usually do it on 443, not on the game port. */
+      if (givenPort !== '443') {
+        const alt = 'wss://' + host + path;
+        step('Checking whether anything answers on the standard TLS port…');
+        const r443 = await S.ping(alt, 7000);
+        if (r443.ok) {
+          suggestion = alt;
+          findings.push({
+            level: 'ok',
+            title: 'Something answers on port 443',
+            text: alt + ' responded in ' + r443.ms + ' ms. If that is your EaglerXServer listener, use this address.'
+          });
+        } else {
+          findings.push({
+            level: 'warn',
+            title: 'Nothing on port 443 either',
+            text: 'So there is no TLS endpoint on this host that a browser can reach. On a shared host that ' +
+                  'usually means the WebSocket listener is not exposed, or is exposed without a certificate.'
+          });
+        }
+      }
+    }
+
+    if (!findings.some((f) => f.level === 'ok')) {
+      findings.push({
+        level: 'warn',
+        title: 'What to check, in order',
+        list: [
+          'Is EaglerXServer.jar actually in plugins/, and did the server restart after you added it?',
+          'What port does listeners: in plugins/EaglerXServer/settings.yml bind? That is the number players need — not 25565.',
+          'Has your host given that port its own allocation, and is it open?',
+          'Does the host give you TLS on it? A browser on an HTTPS page can only use wss://. Free hosts often only offer plain ws://, and then no client on an HTTPS page can connect.',
+          'Is online-mode=false? That one lets you connect and then kicks you at login, which looks different from this.'
+        ]
+      });
+    }
+
+    return { addr: n.addr, findings: findings, suggestion: suggestion, ok: false };
+  };
+
   /* Probe one entry and record the outcome on it. */
   S.probe = async function (id, timeoutMs) {
     const e = S.get(id);
