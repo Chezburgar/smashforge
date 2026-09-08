@@ -84,7 +84,7 @@
       try { history.replaceState(null, '', '#' + view); } catch (e) { /* ignore */ }
     }
     if (view === 'setup') refreshSetup();
-    if (view === 'together') { renderRelays(); renderTurn(); }
+    if (view === 'together') { renderRelays(); renderTurn(); renderVoiceStatic(); }
     if (view === 'friends') pollFriends();
     scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -750,6 +750,113 @@
     renderTurn();
   });
 
+  /* ========================== proximity voice ==========================
+   * Four things have to be true at once (see js/voice.js), so the panel checks
+   * them one at a time and says which one is missing. Two of them can only be
+   * answered by actually trying: asking for the microphone, and gathering ICE
+   * candidates to see whether a relayed call is possible from this network. */
+  const Vo = O.Voice;
+
+  function req(id, kind, detail) {
+    const el = $(id);
+    if (!el) return;
+    el.classList.remove('ok', 'bad', 'warn');
+    el.classList.add(kind);
+    const dot = el.querySelector('.dot');
+    if (dot) {
+      dot.classList.remove('ok', 'bad', 'warn');
+      dot.classList.add(kind);
+    }
+    if (detail) {
+      const span = el.querySelector('span:not(.dot)');
+      if (span) span.textContent = detail;
+    }
+  }
+
+  function voicePill(kind, text) {
+    const pill = $('#voice-pill');
+    pill.className = 'pill' + (kind ? ' ' + kind : '');
+    pill.textContent = text;
+  }
+
+  /* The server side cannot be tested from here — it depends on the server you
+   * happen to join — so it is described rather than claimed. */
+  function renderVoiceStatic() {
+    req('#req-secure', Vo.secure() ? 'ok' : 'bad',
+      Vo.secure()
+        ? 'This page is secure, so the microphone can be asked for.'
+        : 'This page is not on HTTPS. A browser will refuse the microphone outright.');
+    req('#req-server', 'warn',
+      'Not something Orion can check from here: it depends on the server you join, or on a world being shared.');
+  }
+
+  $('#btn-voice-check').addEventListener('click', async function () {
+    this.disabled = true;
+    this.textContent = 'Checking…';
+    notice('voice-state', 'ok', 'Asking for the microphone…');
+    try {
+      await Vo.startMeter(function (level) {
+        $('#mic-bar').style.width = Math.round(level * 100) + '%';
+      });
+      $('#mic-row').style.display = '';
+      $('#mic-label').textContent = Vo.deviceLabel() || 'Microphone';
+      $('#btn-voice-stop').style.display = '';
+      req('#req-mic', 'ok', 'Granted. Say something — the bar should move.');
+    } catch (e) {
+      req('#req-mic', 'bad', e.message);
+      notice('voice-state', 'bad', esc(e.message));
+      voicePill('bad', 'no microphone');
+      this.disabled = false;
+      this.textContent = 'Check my microphone and network';
+      return;
+    }
+
+    notice('voice-state', 'ok', 'Testing whether a call can get through this network…');
+    let ice;
+    try {
+      ice = await Vo.checkIce(7000);
+    } catch (e) {
+      ice = { ok: false, error: e.message, kinds: {} };
+    }
+
+    if (ice.ok) {
+      req('#req-ice', 'ok', 'A relayed connection is available, so voice will get through even if a direct one is blocked.');
+      voicePill('ok', 'ready');
+      notice('voice-state', 'ok',
+        'Your side is ready. Whether you can actually hear anyone now depends on the server or ' +
+        'the world you join carrying voice — turn it on in the game with <kbd>V</kbd>.');
+    } else if (ice.direct) {
+      req('#req-ice', 'warn',
+        'No relayed connection, but a direct one looks possible. Voice will work with people your ' +
+        'network lets you reach directly, and fail with the rest.');
+      voicePill('warn', 'partly');
+      notice('voice-state', 'warn',
+        'TURN did not answer' + (ice.error ? ' (' + esc(ice.error) + ')' : '') +
+        ', so calls will only work where a direct connection is allowed. Press <strong>Test TURN</strong> ' +
+        'above; if that fails too, it is the TURN endpoint and not your network.');
+    } else {
+      req('#req-ice', 'bad', 'No usable connection of any kind was found from this network.');
+      voicePill('bad', 'blocked');
+      notice('voice-state', 'bad',
+        'Nothing got through' + (ice.error ? ' (' + esc(ice.error) + ')' : '') +
+        '. On a network this restrictive, voice and shared worlds will both fail — a phone hotspot ' +
+        'is the usual way to prove that is what it is.');
+    }
+
+    this.disabled = false;
+    this.textContent = 'Check again';
+  });
+
+  $('#btn-voice-stop').addEventListener('click', function () {
+    Vo.closeMic();
+    $('#mic-row').style.display = 'none';
+    $('#btn-voice-stop').style.display = 'none';
+    req('#req-mic', 'warn', 'Released. The game will ask for it again when you turn voice on.');
+  });
+
+  /* Holding a microphone open while nobody is looking at the panel is not on. */
+  window.addEventListener('pagehide', () => Vo.closeMic());
+
   /* ============================== accounts ============================== */
   const Acc = O.Account;
 
@@ -1046,7 +1153,92 @@
     renderFriends();
   });
 
-  /* ============================== launching ============================== */
+  /* ============================== launching ==============================
+   * The boot screen is the only loading screen Orion owns outright, and it has
+   * to cover a big download, so it says which stage it is on and how long it
+   * has been going. There is deliberately no crawling percentage: the client is
+   * injected as a <script>, and between "asked the browser for it" and "the
+   * browser has it" there is nothing to count. The bar advances a real step per
+   * finished stage and shimmers in between, which is the honest shape of it. */
+  const BOOT_STAGES = ['prep', 'turn', 'load', 'start'];
+  let bootAt = 0;
+  let bootTimer = null;
+  let bootStars = null;
+
+  function bootStage(name, done) {
+    const items = document.querySelectorAll('#boot-stages li');
+    const at = BOOT_STAGES.indexOf(name);
+    items.forEach(function (li, i) {
+      li.classList.toggle('done', i < at || (done && i === at));
+      li.classList.toggle('now', !done && i === at);
+    });
+    const steps = (done ? at + 1 : at) / BOOT_STAGES.length;
+    $('#boot-bar-fill').style.width = Math.round(steps * 100) + '%';
+    $('.boot-bar').classList.toggle('working', !done);
+  }
+
+  /* A starfield of its own, because #stars belongs to the launcher shell and
+   * the shell is hidden while this is up. */
+  function startBootStars() {
+    const c = $('#boot-stars');
+    if (!c) return;
+    const g = c.getContext('2d');
+    let live = true;
+    let stars = [];
+    function size() {
+      c.width = Math.floor(window.innerWidth * Math.min(2, window.devicePixelRatio || 1));
+      c.height = Math.floor(window.innerHeight * Math.min(2, window.devicePixelRatio || 1));
+      stars = [];
+      const n = Math.round((c.width * c.height) / 26000);
+      for (let i = 0; i < n; i++) {
+        stars.push({
+          x: Math.random() * c.width, y: Math.random() * c.height,
+          r: Math.random() * 1.5 + 0.3, a: Math.random(), s: 0.2 + Math.random() * 0.8
+        });
+      }
+    }
+    size();
+    window.addEventListener('resize', size);
+    (function frame(t) {
+      if (!live) return;
+      g.clearRect(0, 0, c.width, c.height);
+      for (const st of stars) {
+        const tw = 0.45 + 0.55 * Math.sin(t / 900 * st.s + st.a * 7);
+        g.globalAlpha = 0.15 + tw * 0.5;
+        g.fillStyle = '#d6c9f7';
+        g.fillRect(st.x, st.y, st.r, st.r);
+      }
+      g.globalAlpha = 1;
+      requestAnimationFrame(frame);
+    })(0);
+    bootStars = { stop: function () { live = false; window.removeEventListener('resize', size); } };
+  }
+
+  function bootOn(title, sub) {
+    $('#boot-msg').textContent = title;
+    $('#boot-sub').textContent = sub || '';
+    $('#boot').classList.add('on');
+    bootStage('prep');
+    bootAt = Date.now();
+    if (bootTimer) clearInterval(bootTimer);
+    bootTimer = setInterval(function () {
+      const s = Math.round((Date.now() - bootAt) / 1000);
+      $('#boot-elapsed').textContent = s < 60 ? s + 's' : Math.floor(s / 60) + 'm ' + (s % 60) + 's';
+      /* A launch that is taking a very long time is usually a slow line, not a
+       * hang, and saying so stops people reloading halfway through a 34 MB
+       * download and starting it again. */
+      if (s === 25) $('#boot-hint').textContent = 'Still going. A slow connection can take a few minutes the first time.';
+      if (s === 90) $('#boot-hint').textContent = 'Do not reload — that starts the download over. It will finish.';
+    }, 1000);
+    if (!bootStars) startBootStars();
+  }
+
+  function bootOff() {
+    $('#boot').classList.remove('on');
+    if (bootTimer) { clearInterval(bootTimer); bootTimer = null; }
+    if (bootStars) { bootStars.stop(); bootStars = null; }
+  }
+
   async function launch(entry) {
     const p = probeCache || (await L.probe());
     if (!p.ready) {
@@ -1065,26 +1257,24 @@
     }
 
     const bootVer = Vs.selected();
-    $('#boot-msg').textContent = entry ? 'Joining ' + entry.name : 'Starting Minecraft ' + bootVer.label;
-    $('#boot-sub').textContent = entry ? entry.addr : 'Loading Eaglercraft ' + bootVer.label;
-    $('#boot').classList.add('on');
+    bootOn(entry ? 'Joining ' + entry.name : 'Starting Minecraft ' + bootVer.label,
+           entry ? entry.addr : 'EaglercraftX ' + bootVer.label);
     $('#shell').style.display = 'none';
 
     /* Must happen before the bundle is injected: the wrapper has to be in
      * place on window before the game captures the constructor. A failure here
      * is not fatal — the game falls back to the relay's own ICE list. */
     if (Tn.configured()) {
-      $('#boot-sub').textContent = 'Preparing connection servers…';
+      bootStage('turn');
       try {
         await Tn.prepare();
       } catch (e) { /* shared worlds simply stay as they were */ }
-      $('#boot-sub').textContent = entry ? entry.addr : 'Loading Eaglercraft ' + bootVer.label;
     }
+    bootStage('load');
 
     try {
       await L.launch('game_frame', entry ? entry.addr : null, Vs.selected());
       $('#game-shell').classList.add('on');
-      $('#game-exit').style.display = '';
       watchPointerLock();
       renderVersionPicker();
       const ts = Tn.state();
@@ -1093,11 +1283,22 @@
       }
       Acc.setActivity({ status: Acc.activity().code ? 'hosting' : 'playing', version: Vs.selected().id, server: entry ? entry.addr : null });
       O.stopStars && O.stopStars();
+      /* The bundle is in and main() has been called; the game is now bringing
+       * up its own screen, which is the last stage and the only one whose end
+       * we cannot observe — so it ticks as the boot screen gets out of the way. */
+      bootStage('start');
       /* The client paints over the boot screen itself; drop it once the
        * canvas has had a frame to appear. */
-      setTimeout(() => $('#boot').classList.remove('on'), 2500);
+      setTimeout(function () {
+        bootStage('start', true);
+        bootOff();
+        /* Held back until the boot screen is gone: the bundle finishes loading
+         * before its first frame is painted, so showing it any earlier puts an
+         * exit button on top of the loading screen. */
+        $('#game-exit').style.display = '';
+      }, 2500);
     } catch (err) {
-      $('#boot').classList.remove('on');
+      bootOff();
       $('#shell').style.display = '';
       show('setup');
       notice('setup-state', 'bad', '<strong>Launch failed.</strong> ' + esc(err.message));

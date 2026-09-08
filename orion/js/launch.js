@@ -140,6 +140,9 @@ window.ORION = window.ORION || {};
     const opts = {
       container: containerId,
       worldsDB: v.worldsDB,
+      /* Named explicitly rather than left to the build's default, because
+       * js/packs.js writes into that exact database to install a pack. */
+      resourcePacksDB: v.packsDB || 'resourcePacks',
       demoMode: false,
       servers: optsServers(),
       relays: O.Relays.forOpts()

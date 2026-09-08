@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Disc Printer — Orion Client</title>
+<meta name="description" content="Turn Orion's own music, or your own audio, into music discs your jukeboxes will play.">
+<link rel="icon" href="../assets/orion-logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/orion.css">
+<link rel="stylesheet" href="discs.css">
+</head>
+<body>
+
+<div id="sky"></div>
+<canvas id="stars"></canvas>
+
+<div id="shell">
+  <header class="top">
+    <a class="brand" href="../">
+      <img src="../assets/orion-logo.svg" alt="Orion Client logo">
+      <div>
+        <h1>Orion<span>&nbsp;Client</span></h1>
+        <div class="tag">Disc Printer</div>
+      </div>
+    </a>
+    <div id="whoami"></div>
+    <nav class="tabs">
+      <a class="btn slim ghost" href="../">← Launcher</a>
+    </nav>
+  </header>
+
+  <div class="hero-discs card">
+    <div>
+      <h2>Print a record</h2>
+      <p class="lede">
+        Jukeboxes play the twelve music discs the game ships with. This replaces the music on
+        them: pick a track, put it on a disc, and every jukebox in every world you load plays
+        yours instead.
+      </p>
+      <p class="muted" style="margin:10px 0 0">
+        Tracks come from Orion's own music — the same generated soundtrack the rest of this site
+        runs on, written out at record length — or from an audio file you already have.
+      </p>
+    </div>
+    <div class="hero-art"><canvas id="hero-disc" width="16" height="16" aria-hidden="true"></canvas></div>
+  </div>
+
+  <div id="notice"></div>
+
+  <!-- ============================== the press ============================== -->
+  <div class="card">
+    <h2>1 · Make a track</h2>
+
+    <div class="press-tabs" id="press-tabs">
+      <button class="chip on" data-src="gen">Orion music</button>
+      <button class="chip" data-src="file">A file of my own</button>
+    </div>
+
+    <!-- generated -->
+    <div id="src-gen">
+      <p class="lede">Pick a mood and press <strong>Render</strong>. Nothing is uploaded — the music is
+      made in this tab.</p>
+      <div class="moods" id="moods"></div>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>Length</span>
+          <input type="range" id="f-len" min="20" max="240" step="5" value="90">
+          <span class="hint" id="len-out">90 seconds</span>
+        </label>
+        <label class="field">
+          <span>Seed</span>
+          <input type="text" id="f-seed" maxlength="24" placeholder="anything at all" autocomplete="off" spellcheck="false">
+          <span class="hint">The same mood and seed always give the same track.</span>
+        </label>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-render">Render</button>
+        <button class="btn ghost" id="btn-shuffle">New seed</button>
+      </div>
+    </div>
+
+    <!-- brought in -->
+    <div id="src-file" style="display:none">
+      <p class="lede">
+        Any audio file the browser can play: mp3, ogg, wav, m4a. It is checked by actually
+        decoding it, which is what the game will do too, so if it passes here it plays there.
+      </p>
+      <div id="drop" class="drop">
+        <input type="file" id="file" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac" hidden>
+        <p class="drop-main">Drop an audio file here</p>
+        <p class="drop-sub">or <button class="btn slim" id="btn-pick">choose a file</button></p>
+      </div>
+      <div id="file-report"></div>
+    </div>
+
+    <!-- the current take, whichever way it was made -->
+    <div id="take" class="take" style="display:none">
+      <div class="take-art"><canvas id="take-disc" width="16" height="16"></canvas></div>
+      <div class="take-body">
+        <div class="take-head">
+          <strong id="take-title">Untitled take</strong>
+          <span class="pill" id="take-meta"></span>
+        </div>
+        <canvas id="wave" class="wave" width="900" height="72"></canvas>
+        <div class="btn-row">
+          <button class="btn slim primary" id="btn-play">Play</button>
+          <button class="btn slim" id="btn-assign">Put it on a disc ↓</button>
+          <button class="btn slim ghost" id="btn-discard">Throw it away</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================== the slots ============================== -->
+  <div class="card">
+    <h2>2 · The twelve discs <span class="pill" id="slot-count">0 printed</span></h2>
+    <p class="lede">
+      Each one is a disc that already exists in the game. Fill in as many as you like — the ones
+      you leave alone keep their original music, so printing two discs does not silence the rest.
+    </p>
+    <div class="slot-grid" id="slots"></div>
+  </div>
+
+  <!-- ============================== printing ============================== -->
+  <div class="card">
+    <h2>3 · Print it</h2>
+
+    <div class="form-grid">
+      <label class="field">
+        <span>Pack name</span>
+        <input type="text" id="f-title" maxlength="48" placeholder="My Records" autocomplete="off">
+      </label>
+      <label class="field">
+        <span>For which version</span>
+        <select id="f-version">
+          <option value="1.8" selected>1.8.9</option>
+          <option value="1.12.2">1.12.2</option>
+        </select>
+      </label>
+    </div>
+
+    <div id="print-error" class="note bad hide"></div>
+
+    <div class="btn-row">
+      <button class="btn primary big" id="btn-install">Put it in my game</button>
+      <button class="btn" id="btn-download">Download the .zip</button>
+      <button class="btn ghost" id="btn-publish" style="display:none">Publish to the store</button>
+    </div>
+
+    <div id="print-result"></div>
+
+    <div class="note" id="installed-note" style="display:none"></div>
+  </div>
+
+  <!-- ============================== how and why ============================== -->
+  <div class="card">
+    <h3>How to actually hear it</h3>
+    <ol class="steps">
+      <li>
+        <h4>Print the pack</h4>
+        <p><strong>Put it in my game</strong> writes it straight into the client's own resource
+        pack storage, so there is no file to find and no folder to open.</p>
+      </li>
+      <li>
+        <h4>Turn it on</h4>
+        <p>Launch the client, then <em>Options → Resource Packs</em>, and move your pack from
+        <em>Available</em> to <em>Selected</em>. It stays on from then on.</p>
+      </li>
+      <li>
+        <h4>Put a disc in a jukebox</h4>
+        <p>Any music disc you printed over. In creative the discs are in the Miscellaneous tab;
+        in survival they come from a creeper killed by a skeleton, same as always.</p>
+      </li>
+    </ol>
+    <div class="note">
+      <strong>Why the discs are short.</strong> A generated track is written as uncompressed
+      audio, which is about 44 KB a second — a ninety-second disc is roughly 4 MB. A file you
+      bring is copied in exactly as it is, so an mp3 stays mp3-sized. If you want twelve long
+      discs, bring twelve mp3s.
+    </div>
+  </div>
+
+  <footer class="foot">
+    <p>
+      <strong>Disc Printer</strong> — part of Orion Client. The music is generated in your
+      browser and the pack is built there too; nothing is uploaded unless you publish it.
+    </p>
+  </footer>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/versions.js"></script>
+<script src="../js/zip.js"></script>
+<script src="../js/packs.js"></script>
+<script src="../js/account.js"></script>
+<script src="js/music.js"></script>
+<script src="js/wav.js"></script>
+<script src="js/art.js"></script>
+<script src="js/pack.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

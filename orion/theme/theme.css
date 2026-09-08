@@ -1,0 +1,44 @@
+/* ORION THEME — layout. The shell comes from css/orion.css. */
+
+.theme-grid { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 900px) { .theme-grid { grid-template-columns: 1fr; } }
+
+.moods { display: grid; gap: 9px; margin: 4px 0 18px; }
+.mood {
+  text-align: left; cursor: pointer; padding: 12px 14px; border-radius: 10px;
+  background: rgba(7,6,15,0.42); border: 1px solid var(--line);
+  color: var(--txt2); font-family: var(--font); transition: all .14s ease;
+}
+.mood:hover { border-color: var(--line2); color: var(--txt); }
+.mood.on { border-color: var(--lilac); background: rgba(106,81,184,0.28); color: var(--txt); }
+.mood strong { display: block; font-size: 16px; letter-spacing: 0.04em; color: var(--txt); margin-bottom: 2px; }
+.mood span { font-size: 13px; line-height: 1.4; display: block; }
+
+.field .hint { font-size: 12.5px; color: var(--txt3); letter-spacing: 0; text-transform: none; margin-top: 5px; display: block; }
+
+.checkline {
+  display: flex; gap: 11px; align-items: flex-start; margin: 6px 0 18px;
+  font-size: 14px; line-height: 1.5; color: var(--txt2);
+}
+.checkline input { width: auto; margin-top: 3px; accent-color: var(--lilac); flex: none; }
+.checkline strong { color: var(--txt); }
+
+.swatches { display: flex; gap: 5px; margin-top: 16px; }
+.sw { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line); display: block; }
+
+.shot {
+  width: 100%; height: auto; display: block; border-radius: 10px;
+  border: 1px solid var(--line); background: #000; image-rendering: pixelated;
+}
+.shot-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+.shot-pair h4 { margin: 0 0 7px; font-size: 12.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--txt3); }
+@media (max-width: 560px) { .shot-pair { grid-template-columns: 1fr; } }
+
+.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tbl th, .tbl td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.tbl th { color: var(--txt3); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; }
+.tbl td.mono { font-family: var(--mono); font-size: 12.5px; color: var(--pale); word-break: break-all; }
+
+/* The controls card is narrow, so its two-column form grid would squeeze the
+   wordmark field and its hint into a column three words wide. */
+.theme-grid > .card:first-child .form-grid { grid-template-columns: 1fr; }

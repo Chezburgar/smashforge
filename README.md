@@ -111,6 +111,15 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
 - **A skin designer** — [`orion/skin/`](orion/skin/) draws a Minecraft skin on
   a real 64×64 sheet with a live 3D preview, and exports a PNG the client
   accepts.
+- **A disc printer** — [`orion/discs/`](orion/discs/README.md) turns music into
+  the game's music discs, so every jukebox plays yours. Tracks come from Orion's
+  own generated soundtrack, or from a file you already have.
+- **A menu theme** — [`orion/theme/`](orion/theme/README.md) restyles the main
+  menu, the buttons and the loading screen to match the launcher.
+- **Proximity voice that works** — the client has had it all along and it almost
+  never connects, because it ships no connection servers of its own. Orion's
+  TURN servers fix that, and the *Together* tab checks your microphone and your
+  network and says which part is in the way.
 
 Both builds are installed in [`orion/client/`](orion/client/README.md), so the
 client runs as shipped. That directory's README documents what differs between
@@ -160,7 +169,43 @@ for 1.12.2), confirms the textures are where the game will look for them, and
 rejects the pack with a reason if anything is off. Only a pack that passes is
 sent to the `orion-mods` Edge Function and stored in the `orion-mods` bucket.
 
-### TURN for shared worlds
+### Installing a pack without a file picker
+
+Orion writes resource packs straight into the client's own storage, so printing
+discs or applying a theme is one button rather than a download, a file picker
+and four menus.
+
+That is possible because the game runs inside this page: the IndexedDB database
+it keeps packs in belongs to this origin. The layout was read off a real
+install rather than guessed — adding a pack through the client's own *Open
+resource pack* button produces
+
+```
+database  _net_lax1dude_eaglercraft_v1_8_internal_PlatformFilesystem_1_8_8_resourcePacks
+store     "filesystem", keyPath ["path"]
+rows      { path: "resourcepacks/<folder>/<file inside the zip>", data: bytes }
+index     resourcepacks/manifest.json
+            {"resourcePacks":[{"timestamp":…,"name":…,"folder":…,"domains":[…]}]}
+```
+
+so the client does not keep the zip at all: it unpacks on import and reads
+loose files afterwards. Import also writes two files that are in no zip —
+`optifine/_property_files_index.json` and
+`mcpatcher/cit/potion/_potions_files_index.json`, both empty — because that
+filesystem cannot list a directory, so the client indexes those up front.
+`orion/js/packs.js` writes the same rows, including those two.
+
+Verified end to end: a pack written this way is listed by the game, selectable
+through its own Resource Packs screen, and its textures are applied — the menu
+backdrop changes to the one in the pack.
+
+The game reads that manifest while it starts, so a pack installed while the
+client is already running appears the next time it launches; Orion says so
+rather than pretending it is instant. 1.12.2's pack storage has not been read
+off a real install, so `packsDB` is null there and it is offered as a download
+instead of an install.
+
+### TURN for shared worlds — and for voice
 
 A shared world is a direct WebRTC connection between two browsers, which many
 networks do not allow. A TURN server forwards the traffic instead, and it is
@@ -185,6 +230,23 @@ between replacing the relay's ICE list (`replace`) and adding to it (`append`).
 If the fetch fails, the game keeps the relay's list — a broken TURN endpoint
 leaves shared worlds exactly as they were rather than worse.
 
+The same wrapper is what makes **proximity voice** work. Voice is not a mod and
+could not be one: the client is signed. It is a feature both builds have had all
+along — a voice client with a radius, so you hear the people near you and lose
+them as they walk off — and the reason it so rarely connects is that the client
+ships no STUN or TURN servers of its own. The only such address anywhere in the
+1.8 bundle is `stun:127.69.0.1:6969`, a dummy used to check whether the browser
+has WebRTC at all; everything else comes from whatever list the server sends,
+and those lists are usually the ones Eaglercraft shipped with years ago.
+
+Beyond that, voice needs a microphone (which only the person sitting there can
+grant) and something to carry the signalling: a server running EaglerXServer
+with its voice service enabled, or no server at all — the client has an
+integrated voice service, so a shared world carries voice too. The *Together*
+tab checks the two halves Orion can check, by asking for the microphone and by
+gathering ICE candidates to see whether a relayed call is possible from this
+network, and names whichever condition is missing.
+
 ## Layout
 
 ```
@@ -208,11 +270,16 @@ orion/js/account.js   Orion accounts, friends, presence (Supabase-backed)
 orion/js/versions.js  the builds Orion can launch, and how each one boots
 orion/js/turn.js      TURN injection for shared worlds
 orion/js/config.js    API + TURN endpoints; blank either to disable it
+orion/js/zip.js       writes a .zip in the browser, for packs Orion builds
+orion/js/packs.js     installs a pack into the client's own storage
+orion/js/voice.js     proximity voice: microphone and ICE checks
 orion/client/1.8/     EaglercraftX 1.8-u53 + its signature
 orion/client/1.12.2/  Eaglercraft 1.12.2-u3
 orion/mods/           mod store: browse, install, and (for the owner) upload
 orion/mods/js/pack.js reads a .zip in the browser and rules on compatibility
 orion/skin/           skin designer: 64x64 sheet editor with a 3D preview
+orion/discs/          disc printer: music -> the game's music discs
+orion/theme/          menu theme: main menu, buttons and loading screens
 tools/unpack-eaglercraft.js  pull a client out of an offline .html
 tools/make-orion-logo.js   rasterises the Orion mark to SVG
 ```

@@ -141,6 +141,22 @@ window.ORION = window.ORION || {};
     return any;
   };
 
+  /* The list itself, fetching it if it has not been fetched yet. Only for code
+   * that has to build a peer connection of its own — js/voice.js does, to test
+   * whether a relayed call is even possible on this network. state() stays the
+   * way to *describe* TURN, because it never reveals a credential. */
+  T.list = async function () {
+    if (!servers && T.configured()) await T.refresh();
+    return servers ? servers.slice() : [];
+  };
+
+  /* The unwrapped constructor, for the same reason: a check that measures the
+   * credentials should not be measuring our own patching of them. */
+  T.nativePeerConnection = function () {
+    const w = window.RTCPeerConnection;
+    return (w && w.__orionNative) || w || null;
+  };
+
   /* Fetch, then install, then keep the credentials fresh. Called before the
    * game bundle is injected so the game only ever sees the wrapper. */
   T.prepare = async function () {

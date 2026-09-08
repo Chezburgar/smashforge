@@ -18,10 +18,27 @@
 
 <!-- The game takes over these two layers once it boots. -->
 <div id="boot">
+  <canvas id="boot-stars" aria-hidden="true"></canvas>
   <div class="inner">
     <img src="assets/orion-logo.svg" alt="">
     <div class="msg" id="boot-msg">Starting Orion</div>
     <div class="sub" id="boot-sub"></div>
+
+    <!-- Stages, not a percentage: the client is injected as a script, so the
+         browser reports nothing between "asked for it" and "got it". Each line
+         ticks when it is genuinely done, and the running one is what is
+         actually happening. -->
+    <ol class="boot-stages" id="boot-stages">
+      <li data-stage="prep">Checking your client</li>
+      <li data-stage="turn">Preparing connection servers</li>
+      <li data-stage="load">Downloading the game</li>
+      <li data-stage="start">Starting Minecraft</li>
+    </ol>
+    <div class="boot-bar"><span id="boot-bar-fill"></span></div>
+    <div class="boot-foot">
+      <span id="boot-elapsed">0s</span>
+      <span id="boot-hint">First launch downloads the whole game. After that it is cached.</span>
+    </div>
   </div>
 </div>
 <div id="game-shell">
@@ -83,6 +100,8 @@
       <button role="tab" data-view="setup"   aria-selected="false">Setup</button>
       <a class="tab-link" href="skin/">Skins</a>
       <a class="tab-link" href="mods/">Mods</a>
+      <a class="tab-link" href="discs/">Discs</a>
+      <a class="tab-link" href="theme/">Theme</a>
     </nav>
   </header>
 
@@ -367,6 +386,54 @@
       <div id="turn-state"></div>
       <div class="btn-row">
         <button class="btn slim" id="btn-turn-test">Test TURN</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Proximity voice <span class="pill" id="voice-pill">not checked</span></h2>
+      <p>
+        The client can already do proximity voice chat: you hear the people near you
+        in the world and lose them as they walk off. There is a radius you set
+        yourself, so a whisper across a room is not a shout across the map.
+      </p>
+      <p>
+        It is not a mod and it cannot be — the client is signed, so nothing can be
+        added to it. It is a feature that has been in there all along and almost never
+        works, because the client ships no connection servers of its own and relies on
+        whatever the server hands it, which is usually a list that stopped answering
+        years ago. <strong>Orion's TURN servers are what make it work</strong>, and
+        they are applied to voice the same way they are applied to shared worlds.
+      </p>
+
+      <div class="steps-tight">
+        <div class="req" id="req-secure"><span class="dot"></span><div><strong>A secure page</strong><span>A browser will not hand a microphone to an insecure page.</span></div></div>
+        <div class="req" id="req-mic"><span class="dot"></span><div><strong>A microphone Orion may use</strong><span>Granting it here means the game will not ask again.</span></div></div>
+        <div class="req" id="req-ice"><span class="dot"></span><div><strong>A relayed connection</strong><span>Whether a call can get through this network at all.</span></div></div>
+        <div class="req" id="req-server"><span class="dot"></span><div><strong>A server or world that carries voice</strong><span>EaglerXServer with voice on, or any shared world.</span></div></div>
+      </div>
+
+      <div class="mic-row" id="mic-row" style="display:none">
+        <div class="mic-meter"><span id="mic-bar"></span></div>
+        <span class="mono" id="mic-label"></span>
+      </div>
+
+      <div id="voice-state"></div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-voice-check">Check my microphone and network</button>
+        <button class="btn ghost" id="btn-voice-stop" style="display:none">Stop listening</button>
+      </div>
+
+      <div class="note" style="margin-top:18px">
+        <strong>Turning it on in the game.</strong> Once you are in a world or on a server,
+        open the voice menu — it is on the pause screen, and the default key is
+        <kbd>V</kbd> — choose <em>Nearby</em>, and set the radius. Everyone who wants to be
+        heard has to do the same; there is no way to switch it on for other people.
+      </div>
+      <div class="note">
+        <strong>On your own server.</strong> EaglerXServer has a voice service and it is off
+        until you turn it on. In its config, enable the voice service and leave the ICE server
+        list empty or as it comes — Orion replaces it in the browser either way, so a dead
+        default in that file cannot break your calls.
       </div>
     </div>
 
@@ -730,8 +797,11 @@ play.example.net {
 <script src="js/versions.js"></script>
 <script src="js/servers.js"></script>
 <script src="js/relays.js"></script>
+<script src="js/zip.js"></script>
+<script src="js/packs.js"></script>
 <script src="js/account.js"></script>
 <script src="js/turn.js"></script>
+<script src="js/voice.js"></script>
 <script src="js/launch.js"></script>
 <script src="js/app.js"></script>
 </body>

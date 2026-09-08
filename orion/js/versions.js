@@ -29,6 +29,12 @@
  *             version: world formats are not compatible across them, and every
  *             version here is served from one origin, so a shared database
  *             would let 1.12.2 open a 1.8 world and vice versa.
+ *
+ *   packsDB   IndexedDB name for installed resource packs, same reasoning.
+ *             Passed to the build as resourcePacksDB and used by js/packs.js to
+ *             find the storage it writes into, so the two cannot drift apart.
+ *             null means Orion has not read that build's pack storage and will
+ *             not write to it.
  */
 window.ORION = window.ORION || {};
 (function (O) {
@@ -48,6 +54,7 @@ window.ORION = window.ORION || {};
       signature: 'signature.txt',
       autoStart: true,
       worldsDB: 'worlds',
+      packsDB: 'resourcePacks',
       isDefault: true
     },
     {
@@ -62,6 +69,7 @@ window.ORION = window.ORION || {};
       signature: null,
       autoStart: false,
       worldsDB: 'worlds_1_12_2',
+      packsDB: null,
       isDefault: false
     }
   ];

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Menu Theme — Orion Client</title>
+<meta name="description" content="Restyle the game's main menu, buttons and loading screens to match Orion.">
+<link rel="icon" href="../assets/orion-logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/orion.css">
+<link rel="stylesheet" href="theme.css">
+</head>
+<body>
+
+<div id="sky"></div>
+<canvas id="stars"></canvas>
+
+<div id="shell">
+  <header class="top">
+    <a class="brand" href="../">
+      <img src="../assets/orion-logo.svg" alt="Orion Client logo">
+      <div>
+        <h1>Orion<span>&nbsp;Client</span></h1>
+        <div class="tag">Menu Theme</div>
+      </div>
+    </a>
+    <div id="whoami"></div>
+    <nav class="tabs">
+      <a class="btn slim ghost" href="../">← Launcher</a>
+    </nav>
+  </header>
+
+  <div class="card">
+    <h2>Make the game look like the launcher</h2>
+    <p class="lede">
+      The main menu, its buttons and the screen you stare at while the game loads are all
+      textures, so they can all be replaced. Pick a palette and Orion draws the set: a
+      wordmark instead of the Minecraft logo, a starfield instead of the countryside, and
+      menus that are not the inside of a dirt block.
+    </p>
+    <p class="muted" style="margin:10px 0 0">
+      What you see below is drawn from the actual files the pack will contain, laid out the way
+      the client lays them out — so the preview is the pack, not an impression of it. The one
+      approximation is the main menu's sky: the client washes that toward white, and the preview
+      copies it by eye, so you are not shown a dark sky the game will never draw.
+    </p>
+  </div>
+
+  <div class="theme-grid">
+    <div class="card">
+      <h3>The look</h3>
+      <div class="moods" id="palettes"></div>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>Wordmark</span>
+          <input type="text" id="f-word" maxlength="12" value="ORION" placeholder="ORION" autocomplete="off" spellcheck="false">
+          <span class="hint">Up to 12 letters. It replaces the Minecraft logo on the menu.</span>
+        </label>
+        <label class="field">
+          <span>For which version</span>
+          <select id="f-version">
+            <option value="1.8" selected>1.8.9</option>
+            <option value="1.12.2">1.12.2</option>
+          </select>
+        </label>
+      </div>
+
+      <label class="checkline">
+        <input type="checkbox" id="f-widgets" checked>
+        <span><strong>Restyle the buttons too.</strong> This redraws the whole widget sheet, which
+        also holds the hotbar and the selected-slot outline — so your hotbar changes with it.
+        Turn it off to keep vanilla buttons and touch only the menu.</span>
+      </label>
+
+      <div class="btn-row">
+        <button class="btn" id="btn-sky">A different sky</button>
+      </div>
+
+      <div class="swatches" id="swatches"></div>
+    </div>
+
+    <div class="card">
+      <h3>Main menu</h3>
+      <canvas id="preview" width="640" height="380" class="shot"></canvas>
+      <div class="shot-pair">
+        <div>
+          <h4>Menus</h4>
+          <canvas id="preview-menu" width="320" height="200" class="shot"></canvas>
+        </div>
+        <div>
+          <h4>Loading</h4>
+          <canvas id="preview-load" width="320" height="200" class="shot"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Put it in the game</h3>
+    <div id="pack-error" class="note bad hide"></div>
+    <div class="btn-row">
+      <button class="btn primary big" id="btn-install">Put it in my game</button>
+      <button class="btn" id="btn-download">Download the .zip</button>
+      <button class="btn ghost" id="btn-publish" style="display:none">Publish to the store</button>
+    </div>
+    <div id="pack-result"></div>
+    <div class="note" style="margin-top:16px">
+      <strong>Then turn it on.</strong> In the client: <em>Options → Resource Packs</em>, hover your
+      pack, and choose <em>Select this resource pack</em>. The loading screen changes the next time
+      the game starts; the menu changes as soon as resources reload.
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>What it replaces, and what it cannot</h3>
+    <table class="tbl">
+      <tr><th>File</th><th>What you see change</th></tr>
+      <tr><td class="mono">gui/title/minecraft.png</td><td>The big logo on the main menu</td></tr>
+      <tr><td class="mono">gui/title/mojang.png</td><td>The screen while the game loads its resources</td></tr>
+      <tr><td class="mono">gui/title/background/panorama_0…5.png</td><td>The world turning behind the main menu</td></tr>
+      <tr><td class="mono">gui/options_background.png</td><td>The tiled backdrop on every other menu</td></tr>
+      <tr><td class="mono">gui/widgets.png</td><td>Buttons, the hotbar and the selected-slot outline</td></tr>
+    </table>
+    <div class="note" style="margin-top:14px">
+      A resource pack can change pictures and sounds, and nothing else. The words on the buttons,
+      where they sit, and the launcher's own loading screen are not textures — the button text
+      comes from the language file and the layout is compiled into the client, which is signed and
+      cannot be edited without breaking that signature. Orion's own loading screen, the one before
+      the game appears, is part of the launcher and already matches.
+    </div>
+  </div>
+
+  <footer class="foot">
+    <p><strong>Menu Theme</strong> — part of Orion Client. Every texture here is drawn in your
+    browser; nothing is downloaded and nothing is uploaded unless you publish it.</p>
+  </footer>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/versions.js"></script>
+<script src="../js/zip.js"></script>
+<script src="../js/packs.js"></script>
+<script src="../js/account.js"></script>
+<script src="js/textures.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
