@@ -105,15 +105,19 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
   1.8 is the default because 1.12.2's own first-run screen calls itself early
   and buggy.
 
-- **A mod store** — resource packs at [`orion/mods/`](orion/mods/), filtered by
-  the version they work on. Every pack is opened and checked before it can be
-  published, so what is listed is known to load.
+- **A mod store** — everything you can add to the game in one place at
+  [`orion/mods/`](orion/mods/README.md): the four tools that ship with Orion on
+  one shelf, uploaded resource packs on the other, filtered by the version they
+  work on. Every uploaded pack is opened and checked before it can be published,
+  so what is listed is known to load. The launcher has one link out to it rather
+  than a row of five.
 - **A skin designer** — [`orion/skin/`](orion/skin/) draws a Minecraft skin on
   a real 64×64 sheet with a live 3D preview, and exports a PNG the client
   accepts.
 - **A disc printer** — [`orion/discs/`](orion/discs/README.md) turns music into
-  the game's music discs, so every jukebox plays yours. Tracks come from Orion's
-  own generated soundtrack, or from a file you already have.
+  the game's music discs, so every jukebox plays yours, and ships the printer
+  itself: the jukebox, reskinned and renamed as the Orion Disc Printer. Bring an
+  audio file, or have one generated.
 - **A menu theme** — [`orion/theme/`](orion/theme/README.md) restyles the main
   menu, the buttons and the loading screen to match the launcher.
 - **Proximity voice that works** — the client has had it all along and it almost
@@ -168,6 +172,42 @@ directory, inflates `pack.mcmeta` and checks the `pack_format` (1 for 1.8, 3
 for 1.12.2), confirms the textures are where the game will look for them, and
 rejects the pack with a reason if anything is off. Only a pack that passes is
 sent to the `orion-mods` Edge Function and stored in the `orion-mods` bucket.
+
+### Why an Eaglercraft server usually will not connect
+
+Two facts, both read out of EaglerXServer's own `CONFIG.md` rather than
+guessed, and the first of which this repository previously had wrong:
+
+**Eaglercraft uses the same port as Java Edition.** `listener.cfg` ships with
+`dual_stack = true`: the listener works out what each connection is from the
+first packet — an HTTP/1.1 request is Eaglercraft, anything else is ordinary
+Java — so one port serves both. Earlier versions of the Host tab and of
+**Diagnose** told people to hunt for a separate WebSocket port and to distrust
+25565. That was wrong, and it sent people looking for something that does not
+exist; both now say the opposite.
+
+**TLS is off by default, and that is the real blocker.** Orion is served over
+HTTPS, so the browser will only open `wss://`, and `tls_config.enable_tls`
+defaults to false — a fresh install speaks plain `ws://` and no browser on an
+HTTPS page can reach it, whatever the server does. `require_tls` then defaults
+to *true*, so turning TLS on without also turning that off stops the same port
+accepting Java players.
+
+The certificate is what traps people on a free host. A certificate is issued
+for a name whose DNS you can prove you control, and a free host hands out a
+subdomain of *its* domain — so no authority will issue for it, and TLS on that
+name is impossible for you. The way round is a name you do control (a DuckDNS
+one is enough) pointed at the server, with a DNS-01 challenge, which proves
+ownership through a TXT record and needs no open port. `orion/js/wss.js` holds
+this, and the **wss:// helper** on the Host tab writes out the `tls_config`
+block and the `acme.sh` commands with your own hostname in them — including the
+PKCS#8 conversion, because EaglerXServer wants a PKCS#8 key and most ACME
+clients hand you PKCS#1.
+
+There is also an escape hatch for anyone who cannot get a certificate at all: a
+page served over plain `http://` may open a plain `ws://` socket, so
+`node tools/serve.js . 8123` and `http://localhost:8123/orion/` reaches an
+untouched server. Only for whoever is at that computer, but it works.
 
 ### Installing a pack without a file picker
 

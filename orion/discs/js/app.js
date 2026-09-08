@@ -31,7 +31,7 @@
   /* slot id -> { name, artist, mood, seed, audio, art, seconds, source } */
   const printed = Object.create(null);
   let take = null;              /* the track in hand, not yet on a disc */
-  let source = 'gen';
+  let source = 'file';
   let mood = 'nebula';
   let player = null;            /* the AudioContext currently playing a take */
 
@@ -98,13 +98,13 @@
       await setTake({
         title: NS.MOODS[mood].label + ' · ' + seedText,
         name: NS.MOODS[mood].label,
-        artist: 'Orion',
+        artist: 'Synth',
         mood: mood,
         seed: seed,
         audio: audio,
         samples: track.samples,
         seconds: track.seconds,
-        source: 'Orion music, ' + track.bpm + ' BPM'
+        source: 'generated here, ' + track.bpm + ' BPM'
       });
       clear('#notice');
     } catch (e) {
@@ -314,8 +314,11 @@
 
     const n = Object.keys(printed).length;
     $('#slot-count').textContent = n + ' printed';
-    $('#btn-install').disabled = n === 0;
-    $('#btn-download').disabled = n === 0;
+    /* The printer block on its own is a pack worth having, so it counts. */
+    const nothing = n === 0 && !blockWanted();
+    $('#btn-install').disabled = nothing;
+    $('#btn-download').disabled = nothing;
+    drawBlock();
   }
 
   $('#slots').addEventListener('click', async function (ev) {
@@ -376,6 +379,49 @@
     if (f.dataset.field === 'name') card.querySelector('.slot-name').textContent = f.value || f.dataset.slot;
   });
 
+  /* ---------------------------------------------------------- printer block
+   * The jukebox, reskinned. Drawn here so the two faces can be previewed
+   * before they are in the pack; art.js says why a reskin is the honest answer
+   * rather than a new block. */
+  let blockArt = null;
+
+  function drawBlock() {
+    /* Coloured after whatever is on the first disc, so the machine matches the
+     * records that came out of it. */
+    const first = printed[Object.keys(printed)[0]];
+    const seed = first ? first.seed : 20260908;
+    const mood = first ? first.mood : 'nebula';
+    blockArt = NS.printerBlock({ mood: mood, seed: seed });
+    for (const face of ['top', 'side']) {
+      const c = $('#block-' + face);
+      if (!c) continue;
+      const g = c.getContext('2d');
+      g.clearRect(0, 0, 16, 16);
+      g.drawImage(blockArt[face], 0, 0);
+    }
+  }
+
+  function blockWanted() {
+    return $('#f-block').checked;
+  }
+
+  $('#f-block').addEventListener('change', function () {
+    $('#block-row').classList.toggle('off', !this.checked);
+    lastBuild = null;
+    renderSlots();
+  });
+  $('#f-block-name').addEventListener('input', function () { lastBuild = null; });
+
+  async function blockFiles() {
+    if (!blockWanted()) return null;
+    if (!blockArt) drawBlock();
+    return {
+      side: await NS.toPng(blockArt.side),
+      top: await NS.toPng(blockArt.top),
+      name: $('#f-block-name').value.trim() || 'Orion Disc Printer'
+    };
+  }
+
   /* --------------------------------------------------------------- printing */
 
   function discList() {
@@ -390,18 +436,25 @@
 
   async function buildPack() {
     const discs = discList();
-    if (!discs.length) throw new Error('Nothing has been printed onto a disc yet.');
+    const block = await blockFiles();
+    if (!discs.length && !block) {
+      throw new Error('Nothing to print: put a track on a disc, or include the printer block.');
+    }
     const title = $('#f-title').value.trim() || 'Orion Records';
     const version = $('#f-version').value;
-    const first = printed[Object.keys(printed)[0]];
+    const first = printed[Object.keys(printed)[0]] || { mood: 'nebula', seed: 20260908 };
     const icon = await NS.toPng(NS.packIcon({ mood: first.mood, seed: first.seed }));
+    const parts = [];
+    if (discs.length) parts.push(discs.length + ' disc' + (discs.length === 1 ? '' : 's'));
+    if (block) parts.push('the printer block');
     const built = await NS.build({
       version: version,
       discs: discs,
+      block: block,
       icon: icon,
-      description: title + ' — ' + discs.length + ' disc' + (discs.length === 1 ? '' : 's') + ', printed by Orion'
+      description: title + ' — ' + parts.join(' and ') + ', printed by Orion'
     });
-    return { built: built, title: title, version: version, icon: icon, discs: discs };
+    return { built: built, title: title, version: version, icon: icon, discs: discs, block: block };
   }
 
   /* Building the pack twice — once to install, once to download — would render
@@ -410,6 +463,7 @@
   async function ensureBuild() {
     const key = JSON.stringify({
       t: $('#f-title').value, v: $('#f-version').value,
+      b: blockWanted() ? $('#f-block-name').value : null,
       d: Object.keys(printed).map((id) => id + ':' + printed[id].name + ':' + printed[id].artist + ':' + printed[id].audio.length)
     });
     if (lastBuild && lastBuild.key === key) return lastBuild.value;
@@ -472,10 +526,15 @@
       { name: 'pack.png', bytes: r.icon }
     ];
     const lang = [];
+    if (r.block) {
+      files.push({ name: NS.BLOCK.side, bytes: r.block.side });
+      files.push({ name: NS.BLOCK.top, bytes: r.block.top });
+      lang.push(NS.BLOCK.langKey + '=' + r.block.name);
+    }
     for (const d of r.discs) {
       files.push({ name: 'assets/minecraft/sounds/records/' + d.slot + '.ogg', bytes: d.audio });
       if (d.art) files.push({ name: 'assets/minecraft/textures/items/record_' + d.slot + '.png', bytes: d.art });
-      lang.push('item.record.' + d.slot + '.desc=' + (d.artist || 'Orion') + ' - ' + (d.name || d.slot));
+      lang.push('item.record.' + d.slot + '.desc=' + (d.artist || 'Synth') + ' - ' + (d.name || d.slot));
     }
     lang.sort();
     files.push({ name: target.lang, bytes: lang.join('\n') + '\n' });
@@ -506,7 +565,9 @@
       form.set('action', 'publish');
       form.set('token', Acc.token());
       form.set('title', r.title);
-      form.set('summary', r.discs.length + ' music disc' + (r.discs.length === 1 ? '' : 's') + ' for jukeboxes');
+      form.set('summary', (r.discs.length
+        ? r.discs.length + ' music disc' + (r.discs.length === 1 ? '' : 's')
+        : 'The Orion Disc Printer block') + (r.block && r.discs.length ? ' and the printer block' : ''));
       form.set('body', 'Printed with the Orion disc printer.\n\n' +
         r.discs.map((d) => '· ' + d.slot + ' → ' + (d.artist || 'Orion') + ' – ' + d.name).join('\n'));
       form.set('versions', JSON.stringify([r.version]));
@@ -545,6 +606,7 @@
     renderSlots();
     const hero = $('#hero-disc').getContext('2d');
     hero.drawImage(NS.disc({ mood: 'nebula', seed: 20260908 }), 0, 0);
+    drawBlock();
 
     if (Acc.available()) {
       await Acc.resume();

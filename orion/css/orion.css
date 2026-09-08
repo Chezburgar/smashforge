@@ -459,3 +459,12 @@ footer.foot a { color: var(--txt2); }
 }
 .chip:hover { color: var(--txt); border-color: var(--lilac); }
 .chip.on { color: var(--txt); background: rgba(106,81,184,0.4); border-color: var(--line2); }
+
+/* ------------------------------------------------------------- wss helper
+   Generated config and commands, each with its own copy button. */
+.wss-h {
+  margin: 20px 0 8px; font-size: 12.5px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--txt3); font-weight: 600;
+}
+#wss-out .code { margin-bottom: 10px; }
+#wss-out .note { margin-top: 14px; }

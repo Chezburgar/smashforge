@@ -98,10 +98,9 @@
       <button role="tab" data-view="together" aria-selected="false">Together</button>
       <button role="tab" data-view="host"    aria-selected="false">Host</button>
       <button role="tab" data-view="setup"   aria-selected="false">Setup</button>
-      <a class="tab-link" href="skin/">Skins</a>
-      <a class="tab-link" href="mods/">Mods</a>
-      <a class="tab-link" href="discs/">Discs</a>
-      <a class="tab-link" href="theme/">Theme</a>
+      <!-- One link out, not five: the store is where things you can add to the
+           game live, the disc printer and the theme builder included. -->
+      <a class="tab-link" href="mods/">Mods &amp; tools</a>
     </nav>
   </header>
 
@@ -473,13 +472,22 @@
       <p class="lede">
         A normal Minecraft server does not speak WebSocket, so a browser cannot reach it.
         <a href="https://github.com/lax1dude/eaglerxserver/releases" target="_blank" rel="noopener">EaglerXServer</a>
-        is the plugin that adds that: it opens a WebSocket listener alongside your usual
-        port and translates Eaglercraft clients onto your existing server.
+        is the plugin that adds that, and it does it <strong>on the port you already
+        have</strong>: its listener works out what kind of connection each one is from the
+        first packet — an HTTP request is a browser, anything else is ordinary Java — and
+        translates the browsers onto your existing server.
       </p>
       <div class="note">
-        <strong>Already have a server?</strong> You do not need to move worlds or reinstall.
-        EaglerXServer drops into a server you already run, and Java players keep connecting
-        on port 25565 exactly as before.
+        <strong>So there is no second port to find.</strong> Eaglercraft players use the same
+        address and port as Java Edition. (An earlier version of this page said otherwise and
+        sent people hunting for a listener port that does not exist — sorry.) You do not need
+        to move worlds or reinstall either: it drops into a server you already run.
+      </div>
+      <div class="note warn">
+        <strong>What does need doing is TLS.</strong> This page is HTTPS, so the browser will
+        only open <code>wss://</code>, and EaglerXServer ships with TLS switched off — a fresh
+        install speaks plain <code>ws://</code> and no browser here can reach it. That is the
+        one thing that stops most servers working. There is a helper for it below.
       </div>
     </div>
 
@@ -530,13 +538,18 @@
           </p>
         </li>
         <li>
-          <h4>Find your WebSocket address</h4>
+          <h4>Use the address the panel already shows you</h4>
           <p>
-            The panel shows the address and port allocated to you. Remember that the port
-            players need is the one <strong>EaglerXServer's listener</strong> uses, not the
-            25565-style Java port — check <code>plugins/EaglerXServer/settings.yml</code>.
-            Free hosts often give you an extra allocation for it; add one in the panel if
-            the listener needs its own port.
+            Whatever the panel gives you for Java Edition is the address Eaglercraft uses:
+            same host, same port. You do not need an extra port allocation and there is no
+            second listener to configure — <code>dual_stack</code> in
+            <code>listener.cfg</code> is on by default and serves both.
+          </p>
+          <p>
+            What you almost certainly <em>do</em> need is TLS on it, because this page can
+            only open <code>wss://</code>. The <strong>wss:// helper</strong> further down
+            writes out the config and the certificate commands with your own hostname in
+            them.
           </p>
         </li>
         <li>
@@ -614,18 +627,21 @@ player-info-forwarding-mode = "none"</pre>
           </div>
         </li>
         <li>
-          <h4>Open the WebSocket listener</h4>
+          <h4>Leave the listener alone</h4>
           <p>
-            In <code>plugins/EaglerXServer/settings.yml</code>, the <code>listeners</code>
-            section defines where browsers connect. Note the port it binds — that number,
-            not 25565, is what players put into Orion.
+            EaglerXServer generates <code>plugins/EaglerXServer/listener.cfg</code> with
+            <code>dual_stack = true</code>, which is what makes one port serve both browsers
+            and Java clients. There is nothing to change here to get connected — the port is
+            already the right one.
           </p>
-          <pre class="code"><span class="c"># shape of the generated config — keep the keys it wrote,</span>
-<span class="c"># just confirm the address and port</span>
-listeners:
-  - address: "0.0.0.0:8081"
-    tls_enabled: false</pre>
-          <p>Forward that port on your router or firewall if players are outside your network.</p>
+          <pre class="code"><span class="c"># plugins/EaglerXServer/listener.cfg — the part that matters</span>
+<span class="c"># true by default: HTTP request => Eaglercraft, anything else => Java</span>
+dual_stack = true</pre>
+          <p>
+            On BungeeCord or Velocity there is one extra step instead: in
+            <code>listeners.cfg</code>, <code>inject_address</code> has to match an address
+            already configured on the proxy itself, rather than a port for the plugin to open.
+          </p>
         </li>
         <li>
           <h4>Give it TLS, so browsers will allow it</h4>
@@ -662,15 +678,44 @@ play.example.net {
       </ol>
     </div>
 
+    <!-- The wss:// helper: the one step that stops most servers working. -->
+    <div class="card" id="wss-card">
+      <h2>The <code>wss://</code> helper</h2>
+      <p class="lede">
+        Put in the address your host gave you and the hostname you want players to use, and
+        this writes out the exact config block and the certificate commands. Nothing is sent
+        anywhere — it is all worked out in this tab.
+      </p>
+
+      <div class="form-grid">
+        <label class="field">
+          <span>The address your host gave you</span>
+          <input type="text" id="f-wss-addr" placeholder="ws://mc.falixsrv.me:25565" autocomplete="off" spellcheck="false">
+          <span class="hint">Java address and port. That is the right port — the same one serves browsers.</span>
+        </label>
+        <label class="field">
+          <span>A hostname you control</span>
+          <input type="text" id="f-wss-host" placeholder="mc.yourname.duckdns.org" autocomplete="off" spellcheck="false">
+          <span class="hint">Pointed at the server. A certificate can only be issued for a name whose DNS you can edit.</span>
+        </label>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" id="btn-wss-go">Work out what I need</button>
+      </div>
+
+      <div id="wss-out"></div>
+    </div>
+
     <div class="card">
       <h3>When it will not connect</h3>
       <table class="tbl">
         <thead><tr><th>Symptom</th><th>Usual cause</th></tr></thead>
         <tbody>
-          <tr><td>Blocked immediately</td><td>A <code>ws://</code> address on this HTTPS page. Get a <code>wss://</code> address — see step 4.</td></tr>
-          <tr><td>Times out</td><td>Port not forwarded, or the firewall is dropping it. Confirm the listener port from step 3.</td></tr>
-          <tr><td>Refused</td><td>Right host, wrong port — people often try 25565, which is the Java port, not the WebSocket one.</td></tr>
-          <tr><td>Connects, then drops</td><td>Certificate not trusted (self-signed), or a proxy in front that is not passing WebSocket upgrades.</td></tr>
+          <tr><td>Blocked immediately</td><td>A <code>ws://</code> address on this HTTPS page. The browser refuses it before it reaches the network — the server needs TLS. Use the helper below.</td></tr>
+          <tr><td>Times out</td><td>Nothing is listening, or a firewall is dropping it. Check the server is started and that the panel's port is the one you typed.</td></tr>
+          <tr><td>Refused</td><td>Something answered but not a WebSocket. Usually EaglerXServer is not loaded — check the console for it at startup, and that the server runs Java 17 or newer.</td></tr>
+          <tr><td>Connects, then drops</td><td>A self-signed or expired certificate, or a proxy in front that is not passing WebSocket upgrades. <code>require_tls</code> left at true also does this to Java players.</td></tr>
           <tr><td>Kicked at login</td><td>Online mode is still on. See step 2.</td></tr>
         </tbody>
       </table>
@@ -796,6 +841,7 @@ play.example.net {
 <script src="js/config.js"></script>
 <script src="js/versions.js"></script>
 <script src="js/servers.js"></script>
+<script src="js/wss.js"></script>
 <script src="js/relays.js"></script>
 <script src="js/zip.js"></script>
 <script src="js/packs.js"></script>

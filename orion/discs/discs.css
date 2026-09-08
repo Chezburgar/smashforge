@@ -90,3 +90,13 @@ input[type=range] { accent-color: var(--lilac); width: 100%; }
 @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
 
 .filelist { font-family: var(--mono); font-size: 12px; color: var(--txt3); margin-top: 10px; line-height: 1.7; }
+
+/* ------------------------------------------------------- the printer block */
+.block-row { display: grid; grid-template-columns: 116px minmax(0,1fr); gap: 18px; align-items: start; margin-top: 16px; }
+.block-art { display: grid; gap: 8px; }
+.block-art canvas {
+  width: 100%; image-rendering: pixelated; display: block;
+  border: 1px solid var(--line); border-radius: 8px; background: #07060f;
+}
+.block-row.off { opacity: 0.4; pointer-events: none; }
+@media (max-width: 620px) { .block-row { grid-template-columns: 1fr; } .block-art { grid-template-columns: 1fr 1fr; } }

@@ -34,9 +34,10 @@
 
   <div class="hero-mods card">
     <div>
-      <h2>Resource packs</h2>
+      <h2>Mods &amp; tools</h2>
       <p class="lede">
-        Retextures, colour swaps and sound replacements for Eaglercraft. Every pack here has
+        Everything you can add to the game, in one place: the tools that ship with Orion, and
+        resource packs — retextures, colour swaps, sound replacements. Every uploaded pack has
         been read and checked against the versions Orion runs, so what is listed as working,
         works.
       </p>
@@ -51,6 +52,12 @@
 
   <div id="store-notice"></div>
 
+  <!-- The four that ship with Orion. Listed first because they are the ones
+       that do something the game cannot already do. -->
+  <h3 class="shelf-h">Built into Orion</h3>
+  <div class="mod-grid" id="builtin-grid"></div>
+
+  <h3 class="shelf-h">Resource packs</h3>
   <div class="mod-grid" id="mod-grid">
     <div class="empty" style="grid-column:1/-1"><p>Loading…</p></div>
   </div>
@@ -126,6 +133,7 @@
 
 <script src="../js/config.js"></script>
 <script src="../js/account.js"></script>
+<script src="js/builtin.js"></script>
 <script src="js/pack.js"></script>
 <script src="js/app.js"></script>
 </body>

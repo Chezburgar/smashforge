@@ -243,14 +243,20 @@ window.ORION = window.ORION || {};
     const findings = [];
     let suggestion = null;
 
+    /* The Java port is the right port. EaglerXServer's listener has dual_stack
+     * on by default, and it works out which kind of connection it is from the
+     * first packet: an HTTP/1.1 request is treated as Eaglercraft, anything
+     * else as ordinary Java. So one port serves both, and telling people to
+     * hunt for a second one — which an earlier version of this did — sends
+     * them looking for something that does not exist. */
     const JAVA_PORTS = ['25565', '25566', '25567'];
     if (JAVA_PORTS.includes(givenPort)) {
       findings.push({
-        level: 'warn',
-        title: 'That looks like the Java port, not the WebSocket one',
-        text: 'Port ' + givenPort + ' is what the desktop game uses. Browsers need the port from ' +
-              "EaglerXServer's own listener, which is a different number — check " +
-              'plugins/EaglerXServer/settings.yml, or the extra port your host allocated for it.'
+        level: 'ok',
+        title: 'The port looks right',
+        text: 'Port ' + givenPort + ' is the Java port, and that is the one to use: ' +
+              "EaglerXServer listens for both kinds of connection on your server's own port " +
+              'and tells them apart from the first packet. There is no separate WebSocket port to find.'
       });
     }
 
@@ -324,16 +330,17 @@ window.ORION = window.ORION || {};
       }
     }
 
-    if (!findings.some((f) => f.level === 'ok')) {
+    if (!findings.some((f) => f.level === 'ok' && /works|answers|TLS/.test(f.title))) {
       findings.push({
         level: 'warn',
         title: 'What to check, in order',
         list: [
-          'Is EaglerXServer.jar actually in plugins/, and did the server restart after you added it?',
-          'What port does listeners: in plugins/EaglerXServer/settings.yml bind? That is the number players need — not 25565.',
-          'Has your host given that port its own allocation, and is it open?',
-          'Does the host give you TLS on it? A browser on an HTTPS page can only use wss://. Free hosts often only offer plain ws://, and then no client on an HTTPS page can connect.',
-          'Is online-mode=false? That one lets you connect and then kicks you at login, which looks different from this.'
+          'Is EaglerXServer.jar in plugins/, and did the server restart after you put it there? It needs Java 17 or newer.',
+          'Use your normal Java address and port. EaglerXServer\u2019s listener has dual_stack on by default and serves both kinds of connection on the one port \u2014 there is no second port to find.',
+          'Is TLS on? This is the usual answer. A browser on an HTTPS page can only open wss://, and EaglerXServer ships with enable_tls set to false, so a fresh install only speaks plain ws:// and no browser on this page can reach it. Open the TLS helper below.',
+          'If you turn TLS on, set require_tls to false as well, or the same port stops accepting your Java players.',
+          'Is online-mode=false in server.properties? Eaglercraft players have no Mojang account, so with it on you connect and then get kicked at login \u2014 which looks different from this.',
+          'Running behind Cloudflare or nginx? Then set forward_ip so the real address reaches the server, or EaglerXServer\u2019s rate limiter sees every player as one IP.'
         ]
       });
     }

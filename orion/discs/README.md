@@ -20,7 +20,11 @@ the pack straight into the client's own storage.
 
 Two places, and the difference matters for what ends up in the pack.
 
-**Orion's own music.** SMASHFORGE's soundtrack is generated rather than
+**A file you already have** — the primary route, and the first tab. Decoded
+with `decodeAudioData` to prove it works, then copied into the pack byte for
+byte, so an mp3 stays mp3-sized.
+
+**A generated one.** SMASHFORGE's soundtrack is synthesised rather than
 recorded — an eight-bar loop of oscillators whose filter opens as a fight heats
 up (`js/audio.js`). `music.js` borrows that vocabulary and rearranges it for
 something you would put on a record: an intro, a middle that moves, and an
@@ -29,8 +33,41 @@ which runs as fast as the machine allows rather than in real time, so a
 three-minute track takes a few seconds. A track is decided entirely by its mood
 and its seed, so writing a seed down is enough to get the same disc back.
 
-**A file you already have.** Decoded with `decodeAudioData` to prove it works,
-then copied into the pack byte for byte.
+> This synthesiser is **not** "Orion Music". Orion Music is a different
+> thing — the YouTube-backed music app in the
+> [Orion desktop](https://github.com/Chezburgar/orion) — and an earlier version
+> of this page borrowed its name for the generator, which was confusing. They
+> are unrelated.
+
+## A YouTube track cannot become a disc
+
+Worth stating plainly, because it is the obvious thing to want. Orion Music
+plays through YouTube's own IFrame player, which never hands the audio to the
+page, and the YouTube Data API returns metadata only — there is no endpoint that
+gives you a sound file. So nothing here can take a link and produce a record
+from it. If you have the track as a file, the printer takes the file.
+
+## The printer, as a block
+
+The pack also reskins the **jukebox** into an Orion Disc Printer — new
+textures, new name — so there is a machine in the world that plays what you
+printed.
+
+It is a reskin, and the page says so. A resource pack can change what a block
+looks like and what it is called, and nothing else: a genuinely new block is
+code — a registry entry, a model, a state, an item form, network ids both sides
+agree on — and this client is compiled and signed, so there is nowhere to put
+code. The jukebox is already the machine that plays records, so it is the one
+dressed up. It behaves exactly like a jukebox, because it is one.
+
+Three files, whose names were confirmed by installing a pack and looking at the
+result rather than from memory:
+
+| File | What it changes |
+|---|---|
+| `textures/blocks/jukebox_side.png` | the four sides |
+| `textures/blocks/jukebox_top.png` | the face with the platter |
+| `tile.jukebox.name` in the language file | what it is called in hand and in the world |
 
 ## Why a .ogg file that is not an Ogg
 

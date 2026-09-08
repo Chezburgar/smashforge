@@ -1,9 +1,31 @@
 # The Orion mod store
 
-Resource packs for Eaglercraft, listed at `/orion/mods/`. Anyone with an Orion
-account can browse and download.
+Everything you can add to the game, in one place at `/orion/mods/`: the tools
+that ship with Orion on one shelf, uploaded resource packs on the other. It is
+the launcher's only link out — the disc printer, the theme builder, the skin
+designer and the voice setup used to be a row of five links in the navigation,
+which was the wrong place for them.
+
+Anyone with an Orion account can browse and download.
 **Only an account with the `owner` role can upload** — the store is curated, not
 a free-for-all.
+
+## The built-in shelf
+
+`js/builtin.js` holds the four, and they are not all the same shape. Pretending
+they were would make "install" mean something different from one card to the
+next, so each card carries its kind:
+
+| Kind | Means | Which |
+|---|---|---|
+| `builder` | opens a page that generates a pack from your choices, then installs it | Disc Printer, Menu Theme |
+| `setup` | nothing to install — a client feature to check and switch on | Proximity Voice |
+| `tool` | makes a file you use elsewhere | Skin Designer |
+
+Their artwork is drawn on a canvas rather than shipped as images, so the store
+needs nothing from the network. They honour the version filter like any other
+listing.
+
 
 ```
 orion/mods/index.html   the store front and the upload panel

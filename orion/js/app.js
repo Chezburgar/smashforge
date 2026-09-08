@@ -750,6 +750,111 @@
     renderTurn();
   });
 
+  /* ============================ the wss helper ============================
+   * A server that will not connect is nearly always a server without TLS, and
+   * the fix is two files and a config block. This writes both out with the
+   * user's own hostname in them, because the generic instructions are what
+   * people get stuck on. js/wss.js holds the facts, read out of
+   * EaglerXServer's CONFIG.md rather than guessed. */
+  const Ws = O.Wss;
+
+  function block(title, body, lang) {
+    return '<h4 class="wss-h">' + title + '</h4>' +
+      '<pre class="code' + (lang ? ' ' + lang : '') + '">' + esc(body) + '</pre>' +
+      '<div class="btn-row" style="margin:-4px 0 18px">' +
+      '<button class="btn slim ghost" data-copy="' + esc(body) + '">Copy</button></div>';
+  }
+
+  $('#btn-wss-go').addEventListener('click', function () {
+    const raw = $('#f-wss-addr').value.trim();
+    const wanted = $('#f-wss-host').value.trim();
+    const out = $('#wss-out');
+
+    const parsed = Ws.parse(raw) || Ws.parse('ws://' + raw);
+    if (!parsed) {
+      out.innerHTML = '<div class="note bad">That does not look like a server address. ' +
+        'Something like <code>ws://mc.example.net:25565</code>, or just <code>mc.example.net:25565</code>.</div>';
+      return;
+    }
+
+    let html = '';
+
+    if (parsed.scheme === 'wss') {
+      html += '<div class="note ok"><strong>That is already a wss:// address.</strong> If it still will not ' +
+        'connect, the certificate or the proxy in front of it is the problem rather than the scheme — run ' +
+        '<strong>Diagnose</strong> on it from the Servers tab and it will say which.</div>';
+    }
+
+    /* Whether the host they were given can ever have a certificate is the
+     * thing that decides which route they take, so it comes first. */
+    const cert = Ws.certifiable(parsed.host);
+    if (!cert.ok) {
+      html += '<div class="note warn"><strong>' + esc(parsed.host) + ' cannot be given TLS by you.</strong> ' +
+        esc(cert.why) + '</div>';
+    }
+
+    const target = wanted || '';
+    if (!target) {
+      html += '<div class="note">Fill in a hostname you control and this will write the commands with it in. ' +
+        'A free <a href="https://duckdns.org" target="_blank" rel="noopener">DuckDNS</a> name is enough — ' +
+        'what matters is being able to edit its DNS.</div>';
+    }
+
+    html += '<div class="steps-tight" style="margin-top:18px">' +
+      Ws.dnsSteps(parsed, target).map((st, i) =>
+        '<div class="req ok"><span class="dot ok"></span><div><strong>' + (i + 1) + '. ' + esc(st.title) +
+        '</strong><span>' + esc(st.text) + '</span></div></div>').join('') +
+      '</div>';
+
+    html += block('Paste into plugins/EaglerXServer/listener.cfg', Ws.listenerConfig());
+    html += block('Issue the certificate (on your computer, not the server)',
+      Ws.certCommands(target || 'mc.yourname.duckdns.org'));
+
+    const final = Ws.finalAddress(parsed, target);
+    if (final) {
+      html += '<div class="note ok"><strong>Then join at</strong> <span class="mono">' + esc(final) + '</span>' +
+        ' — same port as before. <button class="btn slim" id="btn-wss-add">Add it to my servers</button></div>';
+    }
+
+    html += '<h4 class="wss-h">If you cannot get a certificate at all</h4>' +
+      '<p class="muted" style="margin:0 0 10px">A page served over plain <code>http://</code> is allowed to ' +
+      'open a plain <code>ws://</code> socket, so running the launcher locally makes an untouched server work. ' +
+      'Only for whoever is at that computer, but it is a real answer.</p>' +
+      block('Run Orion locally over http://', Ws.localFallback());
+
+    out.innerHTML = html;
+    out.dataset.addr = final || '';
+  });
+
+  /* Copy buttons on every generated block. */
+  $('#wss-out').addEventListener('click', async function (ev) {
+    const copy = ev.target.closest('button[data-copy]');
+    if (copy) {
+      try {
+        await navigator.clipboard.writeText(copy.dataset.copy);
+        const was = copy.textContent;
+        copy.textContent = 'Copied';
+        setTimeout(() => { copy.textContent = was; }, 1400);
+      } catch (e) {
+        copy.textContent = 'Select it and copy by hand';
+      }
+      return;
+    }
+    if (ev.target.id === 'btn-wss-add') {
+      const addr = $('#wss-out').dataset.addr;
+      if (!addr) return;
+      const res = S.add('My server', addr);
+      if (res.ok) {
+        renderList();
+        show('servers');
+        notice('srv-notice', 'ok', 'Added <strong>' + esc(addr) + '</strong>. Press <strong>Test</strong> ' +
+          'once the certificate is in place — until then it will not answer.');
+      } else {
+        notice('srv-notice', 'warn', esc(res.error));
+      }
+    }
+  });
+
   /* ========================== proximity voice ==========================
    * Four things have to be true at once (see js/voice.js), so the panel checks
    * them one at a time and says which one is missing. Two of them can only be

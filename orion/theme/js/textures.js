@@ -184,25 +184,34 @@ window.ORION_THEME = window.ORION_THEME || {};
   NS.textWidth = textWidth;
 
   /* ------------------------------------------------------------------ title
-   * The two 155x44 halves the main menu blits side by side. The wordmark is
-   * drawn once across a 310-wide strip and then cut down the middle, which is
-   * the only way to get letters that straddle the join. */
+   * Sleek rather than chiselled: no extrusion, no outline, wide letter
+   * spacing, and a thin accent rule under the word — the launcher's own
+   * heading treatment. Vanilla's logo is a stone slab with a drop shadow; this
+   * deliberately is not.
+   *
+   * The layout constraint is the game's: 1.8 blits the title from two halves
+   * of one sheet, (0,0,155,44) then (0,45,155,44) beside it, so the wordmark
+   * is drawn once across a 310-wide strip and cut down the middle. That is the
+   * only way to get letters that straddle the join.
+   */
   NS.title = function (pal, word) {
     const text = (word || 'ORION').toUpperCase().slice(0, 12);
     const strip = cv(310, 44);
-    /* The letters have to fit in 310x44 with room for the extrusion, and the
-     * scale is whole so every pixel stays on the grid. */
-    const scale = Math.max(3, Math.min(7, Math.floor(298 / Math.max(1, textWidth(text, 1, 1)))));
-    const w = textWidth(text, scale, scale);
-    const x = Math.round((310 - w) / 2);
-    const y = Math.round((44 - 5 * scale) / 2) - 1;
 
-    /* Two extrusions and then the face: a dark one for the drop and a mid one
-     * to catch the light, which is what gives the vanilla logo its weight.
-     * No blur anywhere — this is a texture drawn at 1:1 and then magnified by
-     * the game, so anything soft here arrives as mush. */
-    drawText(strip.g, text, x, y, scale, pal.accent, 'rgba(0,0,0,0.8)');
-    drawText(strip.g, text, x, y, scale, pal.text, null);
+    /* Wide tracking is most of what makes it read as modern, so the gap gets
+     * its own share of the width rather than being a fraction of the glyph. */
+    const scale = Math.max(2, Math.min(6, Math.floor(292 / Math.max(1, textWidth(text, 1, 2)))));
+    const gap = Math.max(scale, Math.round(scale * 1.9));
+    const w = textWidth(text, scale, gap);
+    const x = Math.round((310 - w) / 2);
+    const y = Math.round((44 - 5 * scale) / 2) - 3;
+
+    drawText(strip.g, text, x, y, scale, pal.text, null, gap);
+
+    /* A hairline under the word, in the accent, inset a little at each end. */
+    const ruleY = y + 5 * scale + Math.max(3, scale);
+    strip.g.fillStyle = pal.accent;
+    strip.g.fillRect(x, ruleY, w, Math.max(1, Math.round(scale / 3)));
 
     const out = cv(256, 256);
     out.g.drawImage(strip.c, 0, 0, 155, 44, 0, 0, 155, 44);
@@ -210,53 +219,84 @@ window.ORION_THEME = window.ORION_THEME || {};
     return out.c;
   };
 
-  /* --------------------------------------------------------- loading screen */
+  /* --------------------------------------------------------- loading screen
+   * What the client shows while it reads its resources. Made to match the
+   * launcher's own boot screen: a thin ring, a soft core, the wordmark and one
+   * word underneath. Flat colours, no bevels, nothing pixel-arty. */
   NS.mojang = function (pal, word) {
     const { c, g } = cv(256, 256);
     g.fillStyle = pal.void;
     g.fillRect(0, 0, 256, 256);
 
-    /* The same ring the launcher's logo uses, drawn in pixels. */
-    const cx = 128, cy = 112;
-    for (let i = 0; i < 360; i += 2) {
-      const a = (i * Math.PI) / 180;
-      const rx = 74, ry = 26;
-      const x = Math.round(cx + Math.cos(a) * rx);
-      const y = Math.round(cy + Math.sin(a) * ry);
-      g.fillStyle = pal.accent;
-      g.fillRect(x, y, 3, 3);
-    }
-    const core = g.createRadialGradient(cx, cy, 0, cx, cy, 34);
-    core.addColorStop(0, pal.text);
-    core.addColorStop(0.35, pal.accent);
+    const cx = 128, cy = 104;
+
+    /* the halo */
+    const halo = g.createRadialGradient(cx, cy, 0, cx, cy, 74);
+    halo.addColorStop(0, pal.accent);
+    halo.addColorStop(0.45, 'rgba(0,0,0,0)');
+    g.globalAlpha = 0.5;
+    g.fillStyle = halo;
+    g.fillRect(cx - 80, cy - 80, 160, 160);
+    g.globalAlpha = 1;
+
+    /* one thin ellipse, drawn as a stroke rather than stamped squares */
+    g.save();
+    g.translate(cx, cy);
+    g.rotate(-0.34);
+    g.strokeStyle = pal.accent;
+    g.lineWidth = 3;
+    g.beginPath();
+    g.ellipse(0, 0, 70, 24, 0, 0, Math.PI * 2);
+    g.stroke();
+    g.strokeStyle = pal.text;
+    g.lineWidth = 1;
+    g.beginPath();
+    g.ellipse(0, 0, 70, 24, 0, Math.PI * 0.1, Math.PI * 0.8);
+    g.stroke();
+    g.restore();
+
+    /* the core */
+    const core = g.createRadialGradient(cx, cy, 0, cx, cy, 22);
+    core.addColorStop(0, '#ffffff');
+    core.addColorStop(0.3, pal.text);
     core.addColorStop(1, 'rgba(0,0,0,0)');
     g.fillStyle = core;
-    g.fillRect(cx - 40, cy - 40, 80, 80);
+    g.fillRect(cx - 26, cy - 26, 52, 52);
 
     const text = (word || 'ORION').toUpperCase().slice(0, 12);
-    const scale = 4;
-    const w = textWidth(text, scale, scale);
-    drawText(g, text, Math.round((256 - w) / 2), 176, scale, pal.text, 'rgba(0,0,0,0.6)');
-    drawText(g, 'LOADING', Math.round((256 - textWidth('LOADING', 2, 2)) / 2), 210, 2, pal.dim);
+    const scale = 3;
+    const gap = 6;
+    const w = textWidth(text, scale, gap);
+    drawText(g, text, Math.round((256 - w) / 2), 178, scale, pal.text, null, gap);
+    const sub = 'LOADING';
+    const sw = textWidth(sub, 2, 5);
+    drawText(g, sub, Math.round((256 - sw) / 2), 206, 2, pal.dim, null, 5);
     return c;
   };
 
   /* ----------------------------------------------------------- menu backdrop
-   * 16x16, tiled everywhere. Vanilla's is dirt, which is why every menu looks
-   * like a hole in the ground. */
+   * A 16x16 tile, repeated across every screen that is not the main menu.
+   * Vanilla's is dirt, which is why every Minecraft menu looks like the inside
+   * of a hole. This is a near-flat wash with a very faint grid, so at menu
+   * scale it reads as one calm surface rather than a texture — the launcher's
+   * panel, essentially. The client darkens whatever is here, so it is drawn a
+   * step lighter than the colour wanted on screen.
+   */
   NS.background = function (pal, seed) {
     const { c, g } = cv(16, 16);
-    const r = rng(seed || 1);
     g.fillStyle = pal.bg;
     g.fillRect(0, 0, 16, 16);
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) {
-        const n = r();
-        if (n < 0.16) { g.fillStyle = pal.panel; g.fillRect(x, y, 1, 1); }
-        else if (n < 0.2) { g.fillStyle = pal.void; g.fillRect(x, y, 1, 1); }
-        else if (n < 0.205) { g.fillStyle = pal.line; g.fillRect(x, y, 1, 1); }
-      }
-    }
+    /* One hairline in each direction: enough to catch the light, not enough to
+     * be a pattern. */
+    g.globalAlpha = 0.22;
+    g.fillStyle = pal.panel;
+    g.fillRect(0, 0, 16, 1);
+    g.fillRect(0, 0, 1, 16);
+    g.globalAlpha = 0.16;
+    g.fillStyle = pal.void;
+    g.fillRect(15, 0, 1, 16);
+    g.fillRect(0, 15, 16, 1);
+    g.globalAlpha = 1;
     return c;
   };
 
@@ -311,22 +351,24 @@ window.ORION_THEME = window.ORION_THEME || {};
     const r = rng(seed || 99);
     for (let f = 0; f < 4; f++) {
       const g = faces[f].g;
-      for (let i = 0; i < 18; i++) {
+      for (let i = 0; i < 9; i++) {
         const x = r() * n, y = n * 0.2 + r() * n * 0.6;
         const rad = n * (0.16 + r() * 0.3);
         const grad = g.createRadialGradient(x, y, 0, x, y, rad);
         grad.addColorStop(0, r() < 0.5 ? (pal.cloud || pal.accent) : (pal.cloud2 || pal.accent2));
         grad.addColorStop(1, 'rgba(0,0,0,0)');
-        g.globalAlpha = 0.16 + r() * 0.2;
+        g.globalAlpha = 0.1 + r() * 0.13;
         g.fillStyle = grad;
         g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
       }
       g.globalAlpha = 1;
     }
 
-    /* Stars, dark against a ground the client is going to lighten anyway. */
+    /* Only the bright, bloomed stars are kept. The small ones were single
+     * pixels, and single pixels do not survive the blur — they were work that
+     * arrived as nothing. */
     const sr = rng((seed || 99) ^ 0x5f5f);
-    for (let i = 0; i < 420; i++) {
+    for (let i = 0; i < 46; i++) {
       /* Uniform on the sphere, so no clumping at the poles. */
       const z = sr() * 2 - 1;
       const t = sr() * Math.PI * 2;
@@ -352,83 +394,87 @@ window.ORION_THEME = window.ORION_THEME || {};
       const g = faces[face].g;
       /* A few bright ones for sparkle, the rest darker than the sky so they
        * survive the blend. */
-      const w2 = Math.max(2, Math.round(n / 64));
-      if (bright > 0.8) {
-        /* A bright core with a halo, which is what a star looks like once the
-         * client has blurred it. */
-        const grad = g.createRadialGradient(px, py, 0, px, py, w2 * 2.5);
-        grad.addColorStop(0, pal.star);
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        g.fillStyle = grad;
-        g.fillRect(px - w2 * 3, py - w2 * 3, w2 * 6, w2 * 6);
-      } else {
-        g.fillStyle = bright > 0.4 ? sky1 : (pal.cloud2 || pal.accent2);
-        g.globalAlpha = 0.7;
-        g.fillRect(px, py, w2, w2);
-        g.globalAlpha = 1;
-      }
+      const w2 = Math.max(1, Math.round(n / 110));
+      /* A core with a halo, which is what a star looks like once the client
+       * has blurred it. */
+      const size = w2 * (1.4 + bright * 2.4);
+      const grad = g.createRadialGradient(px, py, 0, px, py, size);
+      grad.addColorStop(0, pal.star);
+      grad.addColorStop(0.25, pal.star);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      g.globalAlpha = 0.18 + bright * 0.34;
+      g.fillStyle = grad;
+      g.fillRect(px - size, py - size, size * 2, size * 2);
+      g.globalAlpha = 1;
     }
 
     return faces.map((f) => f.c);
   };
 
-  /* ---------------------------------------------------------------- widgets */
+  /* ---------------------------------------------------------------- widgets
+   * Flat, not Minecrafty. Vanilla's buttons are a bevel: a light top edge, a
+   * dark bottom one and a gradient between, which is what makes the menu look
+   * like 2011. These are the launcher's buttons instead — one thin border, one
+   * flat fill, and a left-hand accent bar on the hovered state to show focus
+   * the way the launcher's own nav does.
+   *
+   * The regions are still fixed by the game and still have to be filled:
+   *   (0,0,182,22)   hotbar
+   *   (0,22,24,24)   selected-slot highlight
+   *   (0,46,200,20)  button, disabled
+   *   (0,66,200,20)  button, normal
+   *   (0,86,200,20)  button, hovered
+   * A button is stretched from the middle of its strip, so the left and right
+   * ends are what show and the centre is smeared — which is why the accent is
+   * a bar at the very edge rather than anything with detail in it.
+   */
   NS.widgets = function (pal) {
     const { c, g } = cv(256, 256);
     g.clearRect(0, 0, 256, 256);
 
-    /* hotbar: (0,0,182,22) */
-    g.fillStyle = pal.void;
-    g.fillRect(0, 0, 182, 22);
-    g.fillStyle = pal.panel;
-    g.fillRect(1, 1, 180, 20);
-    for (let i = 0; i < 9; i++) {
-      const x = 1 + i * 20;
-      g.fillStyle = pal.bg;
-      g.fillRect(x, 1, 20, 20);
-      g.fillStyle = pal.line;
-      g.fillRect(x, 1, 20, 1);
-      g.fillRect(x, 1, 1, 20);
-      g.fillStyle = 'rgba(0,0,0,0.45)';
-      g.fillRect(x, 20, 20, 1);
-      g.fillRect(x + 19, 1, 1, 20);
-    }
-
-    /* selected slot: (0,22,24,24) — a bright frame that sits over a slot */
-    g.fillStyle = pal.accent;
-    g.fillRect(0, 22, 24, 24);
-    g.fillStyle = 'rgba(0,0,0,0)';
-    g.clearRect(2, 24, 20, 20);
-    g.fillStyle = pal.text;
-    g.fillRect(0, 22, 24, 1);
-    g.fillRect(0, 45, 24, 1);
-    g.fillRect(0, 22, 1, 24);
-    g.fillRect(23, 22, 1, 24);
-
-    /* the three button strips */
-    const button = (y, fill, edge, top, label) => {
-      g.fillStyle = edge;
-      g.fillRect(0, y, 200, 20);
-      g.fillStyle = fill;
-      g.fillRect(1, y + 1, 198, 18);
-      g.fillStyle = top;
-      g.fillRect(1, y + 1, 198, 1);
-      g.fillStyle = 'rgba(0,0,0,0.35)';
-      g.fillRect(1, y + 18, 198, 1);
-      /* corners knocked out, the way vanilla's buttons are */
-      g.clearRect(0, y, 1, 1);
-      g.clearRect(199, y, 1, 1);
-      g.clearRect(0, y + 19, 1, 1);
-      g.clearRect(199, y + 19, 1, 1);
-      if (label) {
-        g.fillStyle = label;
-        g.fillRect(1, y + 1, 1, 18);
-        g.fillRect(198, y + 1, 1, 18);
-      }
+    const hex = (h) => h;
+    /* Slightly transparent fills, so the sky behind the main menu shows
+     * through the way a modern overlay would. */
+    const fill = (x, y, w, h, colour, alpha) => {
+      g.globalAlpha = alpha === undefined ? 1 : alpha;
+      g.fillStyle = colour;
+      g.fillRect(x, y, w, h);
+      g.globalAlpha = 1;
     };
-    button(46, '#2a2a31', '#15151a', 'rgba(255,255,255,0.05)');            /* disabled */
-    button(66, pal.panel, pal.void, 'rgba(255,255,255,0.10)', pal.line);   /* normal */
-    button(86, pal.line, pal.accent, 'rgba(255,255,255,0.22)', pal.accent);/* hovered */
+
+    /* --- hotbar: one flat bar, nine hairline cells --- */
+    fill(0, 0, 182, 22, pal.void, 0.82);
+    fill(0, 0, 182, 1, pal.line, 0.55);
+    fill(0, 21, 182, 1, pal.line, 0.3);
+    for (let i = 1; i < 9; i++) fill(1 + i * 20, 3, 1, 16, pal.line, 0.4);
+
+    /* --- selected slot: a thin accent frame, nothing inside it --- */
+    fill(0, 22, 24, 1, pal.accent);
+    fill(0, 45, 24, 1, pal.accent);
+    fill(0, 22, 1, 24, pal.accent);
+    fill(23, 22, 1, 24, pal.accent);
+    fill(1, 23, 22, 1, pal.accent, 0.3);
+    fill(1, 44, 22, 1, pal.accent, 0.3);
+
+    /* --- the three button states --- */
+    const button = (y, opts) => {
+      /* flat fill */
+      fill(0, y, 200, 20, opts.fill, opts.alpha);
+      /* one-pixel border, all four sides the same weight — no bevel */
+      fill(0, y, 200, 1, opts.border, opts.borderAlpha);
+      fill(0, y + 19, 200, 1, opts.border, opts.borderAlpha);
+      fill(0, y, 1, 20, opts.border, opts.borderAlpha);
+      fill(199, y, 1, 20, opts.border, opts.borderAlpha);
+      /* the accent bar, at the left edge so stretching cannot smear it */
+      if (opts.accent) fill(1, y + 1, 2, 18, opts.accent);
+    };
+
+    /* disabled: barely there */
+    button(46, { fill: pal.void, alpha: 0.5, border: pal.line, borderAlpha: 0.28 });
+    /* normal: the launcher's panel colour */
+    button(66, { fill: pal.panel, alpha: 0.86, border: pal.line, borderAlpha: 0.6 });
+    /* hovered: brighter, with the accent bar lit */
+    button(86, { fill: pal.panel, alpha: 0.97, border: pal.accent, borderAlpha: 0.85, accent: pal.accent });
 
     return c;
   };

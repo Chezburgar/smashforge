@@ -41,8 +41,8 @@
         yours instead.
       </p>
       <p class="muted" style="margin:10px 0 0">
-        Tracks come from Orion's own music — the same generated soundtrack the rest of this site
-        runs on, written out at record length — or from an audio file you already have.
+        Bring an audio file you already have, or have one generated here. It also comes with the
+        printer as a block you can place: the jukebox, reskinned and renamed.
       </p>
     </div>
     <div class="hero-art"><canvas id="hero-disc" width="16" height="16" aria-hidden="true"></canvas></div>
@@ -55,14 +55,18 @@
     <h2>1 · Make a track</h2>
 
     <div class="press-tabs" id="press-tabs">
-      <button class="chip on" data-src="gen">Orion music</button>
-      <button class="chip" data-src="file">A file of my own</button>
+      <button class="chip on" data-src="file">An audio file I have</button>
+      <button class="chip" data-src="gen">Generate one</button>
     </div>
 
     <!-- generated -->
-    <div id="src-gen">
-      <p class="lede">Pick a mood and press <strong>Render</strong>. Nothing is uploaded — the music is
-      made in this tab.</p>
+    <div id="src-gen" style="display:none">
+      <p class="lede">
+        A synthesiser, not a library: pick a mood and it writes a track from scratch in this tab.
+        It is the same generated soundtrack engine that
+        <a href="../../" target="_blank" rel="noopener">SMASHFORGE</a> runs on, stretched out to
+        record length. Nothing is uploaded and nothing is fetched.
+      </p>
       <div class="moods" id="moods"></div>
 
       <div class="form-grid">
@@ -84,11 +88,18 @@
     </div>
 
     <!-- brought in -->
-    <div id="src-file" style="display:none">
+    <div id="src-file">
       <p class="lede">
         Any audio file the browser can play: mp3, ogg, wav, m4a. It is checked by actually
-        decoding it, which is what the game will do too, so if it passes here it plays there.
+        decoding it, which is what the game will do too, so if it passes here it plays there,
+        and it goes into the pack unchanged so it stays its original size.
       </p>
+      <div class="note">
+        <strong>A song from YouTube cannot become a disc.</strong> Orion Music plays through
+        YouTube's own player, which never hands the audio to the page — and the YouTube API has
+        no endpoint that returns a sound file. So there is no way for this to take a link and
+        make a record out of it. If you have the track as a file, drop it in here.
+      </div>
       <div id="drop" class="drop">
         <input type="file" id="file" accept="audio/*,.mp3,.ogg,.wav,.m4a,.flac" hidden>
         <p class="drop-main">Drop an audio file here</p>
@@ -125,9 +136,45 @@
     <div class="slot-grid" id="slots"></div>
   </div>
 
+  <!-- ========================== the printer block ========================== -->
+  <div class="card">
+    <h2>3 · The printer, as a block</h2>
+    <p class="lede">
+      A machine to put the records in. This turns every jukebox into an Orion Disc Printer —
+      new look, new name — so there is a printer in the world that plays what you printed.
+    </p>
+
+    <label class="checkline">
+      <input type="checkbox" id="f-block" checked>
+      <span><strong>Put the printer block in the pack.</strong> It replaces the jukebox's
+      texture and its name. Every jukebox becomes one, including any already placed in your
+      worlds.</span>
+    </label>
+
+    <div class="block-row" id="block-row">
+      <div class="block-art">
+        <canvas id="block-top" width="16" height="16" title="the top face"></canvas>
+        <canvas id="block-side" width="16" height="16" title="the sides"></canvas>
+      </div>
+      <div>
+        <label class="field" style="max-width:320px">
+          <span>What it is called in game</span>
+          <input type="text" id="f-block-name" maxlength="32" value="Orion Disc Printer" autocomplete="off">
+        </label>
+        <div class="note" style="margin-top:14px">
+          <strong>It is a reskin, not a new block.</strong> A resource pack can change what a
+          block looks like and what it is called, and nothing else — a genuinely new block is
+          code, and this client is signed, so there is nowhere to put code. The jukebox is
+          already the machine that plays records, so it is the one dressed up. It behaves
+          exactly like a jukebox: right-click with a disc, right-click again to eject.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ============================== printing ============================== -->
   <div class="card">
-    <h2>3 · Print it</h2>
+    <h2>4 · Print it</h2>
 
     <div class="form-grid">
       <label class="field">
@@ -171,9 +218,13 @@
         <em>Available</em> to <em>Selected</em>. It stays on from then on.</p>
       </li>
       <li>
-        <h4>Put a disc in a jukebox</h4>
-        <p>Any music disc you printed over. In creative the discs are in the Miscellaneous tab;
-        in survival they come from a creeper killed by a skeleton, same as always.</p>
+        <h4>Put a disc in the printer</h4>
+        <p>
+          Any disc you printed over, into any jukebox — which now looks and reads as an Orion
+          Disc Printer. In creative both are in the inventory (search <em>printer</em> for the
+          block, <em>record</em> for the discs); in survival the discs still come from a creeper
+          killed by a skeleton, same as always.
+        </p>
       </li>
     </ol>
     <div class="note">

@@ -77,11 +77,63 @@
     }).join('');
   }
 
+  /* --------------------------------------------------------- built-in mods
+   * Rendered from ORION_MODS.BUILTIN rather than from the database, because
+   * they ship with the launcher. They honour the version filter like anything
+   * else, so filtering to 1.12.2 does not leave a shelf of things that do not
+   * apply. */
+  function renderBuiltin() {
+    const list = filter === 'all'
+      ? NS.BUILTIN
+      : NS.BUILTIN.filter((m) => m.versions.indexOf(filter) >= 0);
+
+    $('#builtin-grid').innerHTML = list.map(function (m) {
+      const kind = NS.KINDS[m.kind] || { label: m.kind, note: '' };
+      return '<div class="mod built" data-built="' + esc(m.id) + '">' +
+        '<div class="mod-art"><canvas data-art="' + esc(m.art) + '" width="96" height="96"></canvas></div>' +
+        '<div class="mod-body">' +
+          '<h3>' + esc(m.title) + '</h3>' +
+          '<div class="mod-sum">' + esc(m.summary) + '</div>' +
+          '<div class="mod-meta">' +
+            m.versions.map((v) => '<span class="pill ok">' + esc(v) + '</span>').join('') +
+            '<span class="kind">' + esc(kind.label) + '</span>' +
+          '</div>' +
+          '<div class="mod-why">' + esc(kind.note) + '</div>' +
+          '<div class="mod-acts">' +
+            '<a class="btn slim primary" href="' + esc(m.href) + '">' + esc(m.action) + '</a>' +
+            '<button class="btn slim ghost" data-act="about" data-built="' + esc(m.id) + '">What it does</button>' +
+          '</div>' +
+        '</div></div>';
+    }).join('');
+
+    /* Canvas art has to be painted after the markup exists. */
+    document.querySelectorAll('#builtin-grid canvas[data-art]').forEach(function (c) {
+      c.getContext('2d').drawImage(NS.builtinArt(c.dataset.art, 96), 0, 0);
+    });
+  }
+
+  $('#builtin-grid').addEventListener('click', function (ev) {
+    const btn = ev.target.closest('button[data-act="about"]');
+    if (!btn) return;
+    const m = NS.BUILTIN.find((x) => x.id === btn.dataset.built);
+    if (!m) return;
+    const card = btn.closest('.mod');
+    const existing = card.querySelector('.mod-about');
+    if (existing) { existing.remove(); btn.textContent = 'What it does'; return; }
+    const box = document.createElement('div');
+    box.className = 'note mod-about';
+    box.style.margin = '12px 0 0';
+    box.innerHTML = esc(m.body);
+    card.querySelector('.mod-body').appendChild(box);
+    btn.textContent = 'Hide';
+  });
+
   $('#filters').addEventListener('click', function (ev) {
     const b = ev.target.closest('button[data-filter]');
     if (!b) return;
     filter = b.dataset.filter;
     document.querySelectorAll('#filters .chip').forEach((c) => c.classList.toggle('on', c === b));
+    renderBuiltin();
     render();
   });
 
@@ -290,6 +342,7 @@
 
   (async function boot() {
     renderWho();
+    renderBuiltin();
     load();
     if (Acc.available()) {
       await Acc.resume();

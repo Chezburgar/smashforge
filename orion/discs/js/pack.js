@@ -42,13 +42,26 @@ window.ORION_DISCS = window.ORION_DISCS || {};
 
   const esc = (s) => String(s == null ? '' : s).replace(/[\r\n=]/g, ' ').trim();
 
+  /* The jukebox, reskinned as the printer. A pack cannot add a block — blocks
+   * are code and the client is signed — but the jukebox is already the machine
+   * that plays records, so it is the honest thing to dress up. These are the
+   * three files 1.8 draws it from, and the language key that names it. */
+  const BLOCK = {
+    side: 'assets/minecraft/textures/blocks/jukebox_side.png',
+    top: 'assets/minecraft/textures/blocks/jukebox_top.png',
+    langKey: 'tile.jukebox.name'
+  };
+  NS.BLOCK = BLOCK;
+
   /* discs: [{ slot, name, artist, audio: Uint8Array, art: Uint8Array }]
    * Only filled slots are written; anything left alone keeps its vanilla
    * sound, which is what you want when printing two discs rather than twelve. */
   NS.build = async function (opts) {
     const target = TARGETS[opts.version] || TARGETS['1.8'];
     const discs = (opts.discs || []).filter((d) => d && d.audio && d.audio.length);
-    if (!discs.length) throw new Error('No discs to print yet.');
+    /* A pack of nothing but the printer block is a reasonable thing to want,
+     * so only refuse when there is neither. */
+    if (!discs.length && !opts.block) throw new Error('No discs to print yet.');
 
     const files = [];
     const lang = [];
@@ -65,6 +78,13 @@ window.ORION_DISCS = window.ORION_DISCS || {};
     });
 
     if (opts.icon) files.push({ name: 'pack.png', bytes: opts.icon });
+
+    /* opts.block: { side, top, name } — the retextured jukebox. */
+    if (opts.block) {
+      files.push({ name: BLOCK.side, bytes: opts.block.side });
+      files.push({ name: BLOCK.top, bytes: opts.block.top });
+      lang.push(BLOCK.langKey + '=' + (esc(opts.block.name) || 'Orion Disc Printer'));
+    }
 
     for (const d of discs) {
       files.push({ name: 'assets/minecraft/sounds/records/' + d.slot + '.ogg', bytes: d.audio });
