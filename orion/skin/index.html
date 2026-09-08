@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Skin Designer — Orion Client</title>
+<meta name="description" content="Draw a Minecraft skin pixel by pixel, see it on the body as you go, and load it straight into Eaglercraft.">
+<link rel="icon" href="../assets/orion-logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/orion.css">
+<link rel="stylesheet" href="skin.css">
+</head>
+<body>
+
+<div id="sky"></div>
+
+<div id="shell">
+  <header class="top">
+    <a class="brand" href="../">
+      <img src="../assets/orion-logo.svg" alt="Orion Client logo">
+      <div>
+        <h1>Orion<span>&nbsp;Client</span></h1>
+        <div class="tag">Skin Designer</div>
+      </div>
+    </a>
+    <nav class="tabs">
+      <a class="btn slim ghost" href="../">← Back to launcher</a>
+    </nav>
+  </header>
+
+  <div class="card" style="padding:16px 18px">
+    <div class="tool-bar">
+      <div class="tool-group" role="group" aria-label="Tool">
+        <button class="tool on" data-tool="pencil" title="Draw (B)"><span>✏</span> Draw</button>
+        <button class="tool" data-tool="eraser" title="Erase (E)"><span>◻</span> Erase</button>
+        <button class="tool" data-tool="fill" title="Fill one face (F)"><span>▦</span> Fill</button>
+        <button class="tool" data-tool="pick" title="Pick a colour (I)"><span>⌖</span> Pick</button>
+      </div>
+
+      <label class="swatch-wrap" title="Current colour">
+        <input type="color" id="colour" value="#c98d6b">
+        <span class="mono" id="colour-hex">#c98d6b</span>
+      </label>
+
+      <div class="tool-group">
+        <button class="tool" id="btn-undo" title="Undo (Ctrl+Z)" disabled>↶</button>
+        <button class="tool" id="btn-redo" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
+      </div>
+
+      <label class="chk" title="Paint the matching pixel on the other side too">
+        <input type="checkbox" id="mirror"> Mirror L/R
+      </label>
+      <label class="chk" title="Show the outlines of each body face">
+        <input type="checkbox" id="guides" checked> Guides
+      </label>
+      <label class="chk" title="Show hat, jacket, sleeves and trousers on the preview">
+        <input type="checkbox" id="overlays" checked> Overlays
+      </label>
+
+      <div class="spacer"></div>
+
+      <button class="btn slim" id="btn-import">Load a skin…</button>
+      <input type="file" id="file" accept="image/png,image/*" hidden>
+      <button class="btn slim ghost danger" id="btn-reset">Start over</button>
+      <button class="btn slim primary" id="btn-export">Download skin</button>
+    </div>
+  </div>
+
+  <div class="editor-grid">
+    <div class="card pane">
+      <div class="pane-head">
+        <h3>The sheet</h3>
+        <div class="pane-tools">
+          <button class="btn slim ghost" id="zoom-out" title="Zoom out">−</button>
+          <span class="mono" id="zoom-label">8×</span>
+          <button class="btn slim ghost" id="zoom-in" title="Zoom in">+</button>
+        </div>
+      </div>
+      <div id="sheet-wrap">
+        <canvas id="sheet"></canvas>
+      </div>
+      <p class="hint mono" id="cursor-hint">—</p>
+      <div class="part-jump" id="part-jump"></div>
+    </div>
+
+    <div class="card pane">
+      <div class="pane-head">
+        <h3>On the body</h3>
+        <div class="pane-tools">
+          <button class="btn slim ghost" id="spin" title="Stop or start turning">⏸</button>
+        </div>
+      </div>
+      <div id="preview-wrap">
+        <canvas id="preview"></canvas>
+      </div>
+      <p class="hint">Drag to turn. This is the same sheet mapped onto the body, so what you see here is what the game shows.</p>
+
+      <h3 style="margin-top:18px">Palette</h3>
+      <div class="palette" id="palette"></div>
+      <h3 style="margin-top:14px">Recent</h3>
+      <div class="palette" id="recent"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Getting it into the game</h3>
+    <ol class="steps">
+      <li>
+        <h4>Download it</h4>
+        <p>Press <strong>Download skin</strong>. You get a 64×64 PNG — the format Minecraft and Eaglercraft both expect.</p>
+      </li>
+      <li>
+        <h4>Add it in the client</h4>
+        <p>
+          <a href="../">Launch the client</a>, then on the main menu choose <em>Edit Profile</em> →
+          <strong>Add Skin</strong> and pick the file you just downloaded. It stays in that browser,
+          so you only do this once per device.
+        </p>
+      </li>
+    </ol>
+    <div class="note">
+      Orion cannot install the skin for you: the client keeps its own skin library inside the
+      game, and the only way in is its own <strong>Add Skin</strong> button. Two clicks, once.
+    </div>
+  </div>
+
+  <footer class="foot">
+    <p>
+      <strong>Skin Designer</strong> — part of Orion Client. Everything happens in this browser;
+      nothing is uploaded, and the starting body is generated in code rather than copied from
+      anyone's skin.
+    </p>
+  </footer>
+</div>
+
+<script src="js/uv.js"></script>
+<script src="js/preview.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
