@@ -89,9 +89,12 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
   a relay, so friends see it on their own Multiplayer screen without typing an
   address or forwarding a port. Orion manages the relay list and can test each
   one. See the *Together* tab.
-- **A players list** — everyone with Orion open who has chosen to appear, what
-  they are hosting, and a request you can send to ask into their world. Hosts
-  either publish their join code openly or keep it hidden until they accept.
+- **An Orion account** — the launcher is behind a sign-in. Make a name and a
+  password once and it is remembered on that browser; there is no email to give
+  and nothing to confirm.
+- **Friends** — add someone by their Orion name, and once they accept you can
+  see when they are online, what they are playing and join the server they are
+  on in one click, straight from the launcher.
 - **A free-hosting route** — for a world that outlives the host's tab, the
   *Host* tab walks through creating a free server on FalixNodes and putting
   EaglerXServer on it, including the `wss://` requirement that decides whether
@@ -101,6 +104,13 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
   (Eaglercraft 1.12.2-u3). Pick one on the Play tab; the choice is remembered.
   1.8 is the default because 1.12.2's own first-run screen calls itself early
   and buggy.
+
+- **A mod store** — resource packs at [`orion/mods/`](orion/mods/), filtered by
+  the version they work on. Every pack is opened and checked before it can be
+  published, so what is listed is known to load.
+- **A skin designer** — [`orion/skin/`](orion/skin/) draws a Minecraft skin on
+  a real 64×64 sheet with a live 3D preview, and exports a PNG the client
+  accepts.
 
 Both builds are installed in [`orion/client/`](orion/client/README.md), so the
 client runs as shipped. That directory's README documents what differs between
@@ -118,24 +128,37 @@ Pages settings to change. `.github/workflows/checks.yml` validates instead of
 deploying: it parses every tracked `.js` file and fails if the committed logo
 no longer matches its generator.
 
-### The players list needs a backend
+### Accounts, friends and the mod store need a backend
 
-Everything else in Orion is static and per-browser. "Who is online" cannot be,
-so it lives in Supabase — three functions and a view behind
-`orion/js/config.js`. Blank out `config.lobby.url` and the tab disappears while
-the rest of Orion carries on.
+Everything else in Orion is static and per-browser. Who is online cannot be, so
+it lives in Supabase behind `orion/js/config.js`.
 
-There are no accounts. Each browser mints a random session id and a secret;
-the secret proves the row is yours and only its hash is stored. The tables
-themselves are unreachable with the publishable key — `anon` has no grant on
-them at all — and every write goes through a `SECURITY DEFINER` function that
-checks the secret first. Reads come from a view that omits secrets, drops rows
-older than 75 seconds, and withholds a host's join code unless they chose to
-publish it. Usernames are stripped to `[A-Za-z0-9 _-.]` before storage, so a
-name cannot smuggle markup into anyone's page.
+Orion accounts are **Orion's own**, separate from anything else on this site: a
+name, a password, and nothing else — no email, so there is nothing to verify
+and nothing to leak. Passwords are stored as bcrypt hashes (`extensions.crypt`
+with a per-password salt; pgcrypto lives in the `extensions` schema, so every
+call has to be schema-qualified). Signing in returns a random session token
+which the browser keeps in `localStorage`; only its hash is stored server-side,
+and it expires.
 
-Appearing in the list is opt-in and off on every load: the name you type there
-is visible to strangers, which the tab says plainly before you go online.
+The tables are unreachable with the publishable key — `anon` has no grant on
+them at all, and the helper functions are revoked `from public` as well as from
+`anon`, because Postgres grants `EXECUTE` to `PUBLIC` by default. Every read
+and write goes through a `SECURITY DEFINER` function that checks the token
+first. Names are stripped to `[A-Za-z0-9_.-]` before storage, so a name cannot
+smuggle markup into anyone's page.
+
+Presence is friends-only: a friend sees that you are online and what you are
+playing, and a stranger sees nothing at all. Friendship needs both sides — a
+request, then an accept — and either side can remove it.
+
+The mod store publishes from the same account system. Anyone signed in can
+browse and install; only an account with the `owner` role can upload. An upload
+is not taken on trust: the browser opens the `.zip`, reads its central
+directory, inflates `pack.mcmeta` and checks the `pack_format` (1 for 1.8, 3
+for 1.12.2), confirms the textures are where the game will look for them, and
+rejects the pack with a reason if anything is off. Only a pack that passes is
+sent to the `orion-mods` Edge Function and stored in the `orion-mods` bucket.
 
 ### TURN for shared worlds
 
@@ -181,12 +204,15 @@ orion/js/servers.js   server book: validation, storage, reachability probes
 orion/js/launch.js    bundle discovery + eaglercraftXOpts handoff
 orion/js/app.js       launcher UI
 orion/js/relays.js    relay book: the no-server path for playing together
-orion/js/lobby.js     players list, play requests (Supabase-backed)
+orion/js/account.js   Orion accounts, friends, presence (Supabase-backed)
 orion/js/versions.js  the builds Orion can launch, and how each one boots
 orion/js/turn.js      TURN injection for shared worlds
-orion/js/config.js    lobby + TURN endpoints; blank either to disable it
+orion/js/config.js    API + TURN endpoints; blank either to disable it
 orion/client/1.8/     EaglercraftX 1.8-u53 + its signature
 orion/client/1.12.2/  Eaglercraft 1.12.2-u3
+orion/mods/           mod store: browse, install, and (for the owner) upload
+orion/mods/js/pack.js reads a .zip in the browser and rules on compatibility
+orion/skin/           skin designer: 64x64 sheet editor with a 3D preview
 tools/unpack-eaglercraft.js  pull a client out of an offline .html
 tools/make-orion-logo.js   rasterises the Orion mark to SVG
 ```

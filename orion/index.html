@@ -29,6 +29,40 @@
 </div>
 <button class="btn slim" id="game-exit" style="display:none">Exit to launcher</button>
 
+<!-- Nothing in the launcher is reachable until this is satisfied. -->
+<div id="gate">
+  <div class="gate-box">
+    <img src="assets/orion-logo.svg" alt="" class="gate-logo">
+    <h2>Orion Client</h2>
+    <p class="gate-sub" id="gate-sub">Sign in to play.</p>
+
+    <div class="gate-tabs">
+      <button class="gate-tab on" data-mode="in">Sign in</button>
+      <button class="gate-tab" data-mode="up">Create account</button>
+    </div>
+
+    <label class="field">
+      <span>Name</span>
+      <input type="text" id="g-user" autocomplete="username" maxlength="16" placeholder="3–16 characters">
+    </label>
+    <label class="field">
+      <span>Password</span>
+      <input type="password" id="g-pass" autocomplete="current-password" placeholder="at least 8 characters">
+    </label>
+    <label class="field" id="g-pass2-wrap" style="display:none">
+      <span>Password again</span>
+      <input type="password" id="g-pass2" autocomplete="new-password">
+    </label>
+
+    <div id="gate-error" class="note bad hide"></div>
+    <button class="btn primary big" id="g-go" style="width:100%;justify-content:center">Sign in</button>
+    <p class="gate-fine" id="gate-fine">
+      Your name is visible to other players. Nothing else is — no email is asked for and none
+      is needed.
+    </p>
+  </div>
+</div>
+
 <div id="shell">
 
   <header class="top">
@@ -39,14 +73,16 @@
         <div class="tag">Eaglercraft · Browser</div>
       </div>
     </a>
+    <div id="whoami"></div>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button role="tab" data-view="play"    aria-selected="true">Play</button>
       <button role="tab" data-view="servers" aria-selected="false">Servers</button>
-      <button role="tab" data-view="players" aria-selected="false">Players</button>
-      <button role="tab" data-view="friends"  aria-selected="false">Together</button>
+      <button role="tab" data-view="friends" aria-selected="false">Friends</button>
+      <button role="tab" data-view="together" aria-selected="false">Together</button>
       <button role="tab" data-view="host"    aria-selected="false">Host</button>
       <button role="tab" data-view="setup"   aria-selected="false">Setup</button>
       <a class="tab-link" href="skin/">Skins</a>
+      <a class="tab-link" href="mods/">Mods</a>
     </nav>
   </header>
 
@@ -85,11 +121,11 @@
       <p>
         You do not need a server to play together. Launch the client, make a
         singleplayer world, open it to other players, and your friends see it appear in
-        their own list. <a href="#" data-goto="friends">How it works →</a>
+        their own list. <a href="#" data-goto="together">How it works →</a>
       </p>
       <div class="btn-row">
         <button class="btn primary" id="btn-launch-2">▶ Launch client</button>
-        <button class="btn ghost" id="btn-goto-friends">Read the walkthrough</button>
+        <button class="btn ghost" id="btn-goto-together">Read the walkthrough</button>
       </div>
     </div>
 
@@ -156,52 +192,36 @@
     </div>
   </section>
 
-  <!-- ======================== PLAYERS ======================== -->
-  <section class="view" id="v-players" role="tabpanel">
+  <!-- ======================== FRIENDS ======================== -->
+  <section class="view" id="v-friends" role="tabpanel">
     <div class="card">
-      <h2>Who's online <span class="pill" id="players-count">0</span></h2>
+      <h2>Friends <span class="pill" id="friends-count">0</span></h2>
       <p class="lede">
-        Everyone with Orion open who has chosen to appear here. Find someone hosting a
-        world, ask to join, and they can let you in.
+        Add someone once and they stay on your list. When they are online you can see what
+        they are playing and join them from here.
       </p>
-      <div id="lobby-off">
-        <div class="note">
-          <strong>You are not listed yet.</strong> Pick a name and go online. Your name
-          becomes visible to anyone else with this page open — so pick a nickname, not
-          your real name, and nothing you would mind strangers seeing. Nothing else is
-          shared: no email, no location, no IP address.
-        </div>
-        <div class="form-grid">
-          <label class="field">
-            <span>Your name here</span>
-            <input type="text" id="f-lobby-name" placeholder="Nickname" autocomplete="off" maxlength="20">
-          </label>
-          <div style="align-self:end;padding-bottom:14px">
-            <button class="btn primary" id="btn-go-online">Go online</button>
-          </div>
-        </div>
-        <div id="lobby-error" class="note bad hide"></div>
-      </div>
-
-      <div id="lobby-on" style="display:none">
-        <div class="note ok" id="lobby-status"></div>
-        <div class="btn-row">
-          <button class="btn slim" id="btn-refresh-players">Refresh</button>
-          <button class="btn slim ghost" id="btn-go-offline">Go offline</button>
+      <div id="me-card"></div>
+      <div class="form-grid" style="margin-top:16px">
+        <label class="field">
+          <span>Add by name or friend code</span>
+          <input type="text" id="f-friend" placeholder="Name or ABC123" autocomplete="off" maxlength="20">
+        </label>
+        <div style="align-self:end;padding-bottom:14px">
+          <button class="btn primary" id="btn-friend-add">Add friend</button>
         </div>
       </div>
+      <div id="friend-notice"></div>
     </div>
 
-    <div class="card" id="host-card" style="display:none">
-      <h3>Let people into your world</h3>
+    <div class="card" id="hosting-card">
+      <h3>What your friends see</h3>
       <p>
-        Open your world to other players in the game (<kbd>Esc</kbd> → the share option),
-        and the client shows a <strong>join code</strong>. Orion cannot read that code off
-        the game screen, so paste it here and other players can use it.
+        Nothing here is shared until you fill it in. Open a world to other players in the
+        game, and paste the join code it shows you so friends can get in.
       </p>
       <div class="form-grid">
         <label class="field">
-          <span>World name (shown to others)</span>
+          <span>World name</span>
           <input type="text" id="f-world-name" placeholder="My survival world" autocomplete="off" maxlength="40">
         </label>
         <label class="field">
@@ -209,35 +229,21 @@
           <input type="text" id="f-world-code" placeholder="paste the code here" autocomplete="off" spellcheck="false" maxlength="64">
         </label>
       </div>
-      <label class="field" style="display:flex;gap:10px;align-items:flex-start">
-        <input type="checkbox" id="f-world-open" style="width:auto;margin-top:3px">
-        <span style="letter-spacing:0;text-transform:none;font-size:14.5px;color:var(--txt2)">
-          <strong style="color:var(--txt)">Let anyone join without asking.</strong>
-          Leave this off and your code stays hidden until you accept a request.
-        </span>
-      </label>
       <div class="btn-row">
-        <button class="btn primary" id="btn-save-world">Save</button>
-        <button class="btn ghost" id="btn-clear-world">Stop hosting</button>
+        <button class="btn primary" id="btn-save-world">Share it</button>
+        <button class="btn ghost" id="btn-clear-world">Stop sharing</button>
       </div>
       <div id="world-error" class="note bad hide"></div>
     </div>
 
-    <div class="card" id="requests-card" style="display:none">
-      <h3>Requests <span class="pill" id="req-count">0</span></h3>
-      <div id="req-notice"></div>
-      <div class="srv-list" id="req-list"></div>
-    </div>
-
-    <div class="card" id="players-card" style="display:none">
-      <h3>Players</h3>
-      <div id="players-notice"></div>
-      <div class="srv-list" id="players-list"></div>
+    <div class="card">
+      <h3>Your list</h3>
+      <div class="srv-list" id="friend-list"></div>
     </div>
   </section>
 
   <!-- ======================== FRIENDS ======================== -->
-  <section class="view" id="v-friends" role="tabpanel">
+  <section class="view" id="v-together" role="tabpanel">
     <div class="card">
       <h2>Play together, with nothing to set up</h2>
       <p class="lede">
@@ -315,10 +321,10 @@
         need to look it up again.
       </div>
       <div class="note">
-        <strong>Playing with strangers rather than friends?</strong> The
-        <a href="#" data-goto="players">Players</a> tab lists everyone who has Orion open
-        and has chosen to appear, so you can ask to join a world without swapping codes
-        anywhere else first.
+        <strong>Tired of swapping codes every time?</strong> The
+        <a href="#" data-goto="friends">Friends</a> tab keeps a list of the people you
+        have added, so you can see when they are online and join what they are playing
+        without passing an address around first.
       </div>
     </div>
 
@@ -705,10 +711,9 @@ play.example.net {
   <footer class="foot">
     <p>
       <strong>Orion Client</strong> — a launcher shell for Eaglercraft, built to run on GitHub Pages.
-      Your servers, relays and settings live in this browser and are never uploaded. The only
-      thing that leaves your device is what you deliberately publish to the
-      <a href="#" data-goto="players">Players</a> list — the name you type there, and a world
-      code if you choose to host — which stays listed only while Orion is open.
+      Your servers, relays and settings live in this browser and are never uploaded. Your
+      account name, and anything you choose to share with friends — a world name and its
+      join code — are kept on the server so your friends can see them.
     </p>
     <p>
       Eaglercraft and EaglerXServer are the work of
@@ -725,7 +730,7 @@ play.example.net {
 <script src="js/versions.js"></script>
 <script src="js/servers.js"></script>
 <script src="js/relays.js"></script>
-<script src="js/lobby.js"></script>
+<script src="js/account.js"></script>
 <script src="js/turn.js"></script>
 <script src="js/launch.js"></script>
 <script src="js/app.js"></script>

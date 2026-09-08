@@ -84,8 +84,8 @@
       try { history.replaceState(null, '', '#' + view); } catch (e) { /* ignore */ }
     }
     if (view === 'setup') refreshSetup();
-    if (view === 'friends') { renderRelays(); renderTurn(); }
-    if (view === 'players') { renderLobby(); pollLobby(); }
+    if (view === 'together') { renderRelays(); renderTurn(); }
+    if (view === 'friends') pollFriends();
     scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -750,272 +750,301 @@
     renderTurn();
   });
 
-  /* ============================== lobby ============================== */
-  const Lb = O.Lobby;
+  /* ============================== accounts ============================== */
+  const Acc = O.Account;
 
-  /* Hide the tab entirely when no backend is configured, rather than showing a
-   * section that cannot work. */
-  if (!Lb.available()) {
-    const tab = document.querySelector('nav.tabs button[data-view="players"]');
-    if (tab) tab.style.display = 'none';
+  function gateOn(show) {
+    $('#gate').classList.toggle('on', show);
+    $('#shell').style.display = show ? 'none' : '';
   }
 
-  let pollTimer = null;
+  let gateMode = 'in';
 
-  function renderLobby() {
-    const on = Lb.isOnline();
-    const me = Lb.me();
-    $('#lobby-off').style.display = on ? 'none' : '';
-    $('#lobby-on').style.display = on ? '' : 'none';
-    $('#host-card').style.display = on ? '' : 'none';
-    $('#requests-card').style.display = on ? '' : 'none';
-    $('#players-card').style.display = on ? '' : 'none';
-    if (on) {
-      $('#lobby-status').innerHTML =
-        'You are listed as <strong>' + esc(me.username) + '</strong>' +
-        (me.code
-          ? ' — hosting <strong>' + esc(me.world || 'a world') + '</strong>' +
-            (me.open ? ' <span class="pill ok">open to anyone</span>' : ' <span class="pill">ask first</span>')
-          : ' — not hosting anything right now') + '.';
-      $('#f-world-name').value = me.world || '';
-      $('#f-world-code').value = me.code || '';
-      $('#f-world-open').checked = !!me.open;
+  function renderGate(msg, kind) {
+    const up = gateMode === 'up';
+    $('#g-pass2-wrap').style.display = up ? '' : 'none';
+    $('#g-go').textContent = up ? 'Create account' : 'Sign in';
+    $('#g-pass').setAttribute('autocomplete', up ? 'new-password' : 'current-password');
+    $('#gate-sub').textContent = up ? 'Pick a name and a password.' : 'Sign in to play.';
+    document.querySelectorAll('.gate-tab').forEach((b) => b.classList.toggle('on', (b.dataset.mode === 'up') === up));
+    const err = $('#gate-error');
+    if (msg) {
+      err.className = 'note ' + (kind || 'bad');
+      err.textContent = msg;
     } else {
-      $('#f-lobby-name').value = me.username || '';
+      err.className = 'note bad hide';
+      err.textContent = '';
     }
   }
 
-  function statusPill(p) {
-    if (p.status === 'hosting') return '<span class="pill ok">hosting</span>';
-    if (p.status === 'playing') return '<span class="pill">playing</span>';
-    return '<span class="pill">idle</span>';
+  document.querySelectorAll('.gate-tab').forEach(function (b) {
+    b.addEventListener('click', function () {
+      gateMode = b.dataset.mode;
+      renderGate(null);
+    });
+  });
+
+  async function submitGate() {
+    const btn = $('#g-go');
+    const user = $('#g-user').value.trim();
+    const pass = $('#g-pass').value;
+
+    if (gateMode === 'up' && pass !== $('#g-pass2').value) {
+      renderGate('Those two passwords are not the same.');
+      return;
+    }
+    btn.disabled = true;
+    const was = btn.textContent;
+    btn.textContent = 'Just a moment…';
+    const res = gateMode === 'up' ? await Acc.register(user, pass) : await Acc.login(user, pass);
+    btn.disabled = false;
+    btn.textContent = was;
+
+    if (!res.ok) {
+      renderGate(res.error);
+      return;
+    }
+    $('#g-pass').value = '';
+    $('#g-pass2').value = '';
+    renderGate(null);
+    afterSignIn();
   }
 
-  async function refreshPlayers() {
+  $('#g-go').addEventListener('click', submitGate);
+  ['#g-user', '#g-pass', '#g-pass2'].forEach((sel) =>
+    $(sel).addEventListener('keydown', (e) => { if (e.key === 'Enter') submitGate(); })
+  );
+
+  function renderWho() {
+    const m = Acc.me();
+    const box = $('#whoami');
+    if (!m) {
+      box.innerHTML = '';
+      return;
+    }
+    box.innerHTML =
+      '<span class="who">Signed in as <strong>' + esc(m.username) + '</strong>' +
+      (m.role === 'owner' ? ' <span class="pill ok">owner</span>' : '') + '</span>' +
+      '<button class="code" id="btn-copy-code" title="Your friend code — click to copy">' + esc(m.friend_code) + '</button>' +
+      '<button class="btn slim ghost" id="btn-signout">Sign out</button>';
+  }
+
+  $('#whoami').addEventListener('click', async function (ev) {
+    if (ev.target.closest('#btn-signout')) {
+      await Acc.logout();
+      renderWho();
+      gateOn(true);
+      renderGate('Signed out.', 'ok');
+      return;
+    }
+    const code = ev.target.closest('#btn-copy-code');
+    if (code) {
+      try {
+        await navigator.clipboard.writeText(code.textContent.trim());
+        code.textContent = 'copied!';
+        setTimeout(renderWho, 1200);
+      } catch (e) { /* leave it showing */ }
+    }
+  });
+
+  function afterSignIn() {
+    gateOn(false);
+    renderWho();
+    Acc.setActivity({ version: Vs.selected().id });
+    renderFriends();
+    pollFriends();
+  }
+
+  /* ============================== friends ============================== */
+
+  let friendTimer = null;
+
+  function meCard() {
+    const m = Acc.me();
+    if (!m) return;
+    $('#me-card').innerHTML =
+      '<div class="note"><strong>Your friend code is ' + esc(m.friend_code) + '.</strong> ' +
+      'Give it to someone and they can add you with it — it is easier to get right than a name.</div>';
+  }
+
+  async function renderFriends() {
+    if (!Acc.signedIn()) return;
+    meCard();
     let rows;
     try {
-      rows = await Lb.players();
+      rows = await Acc.friends();
     } catch (e) {
-      notice('players-notice', 'bad', 'Could not reach the lobby: ' + esc(e.message));
-      return;
-    }
-    notice('players-notice', '', '');
-    $('#players-count').textContent = String(rows.length);
-
-    const others = rows.filter((r) => !r.isMe);
-    if (!others.length) {
-      $('#players-list').innerHTML =
-        '<div class="empty"><p>Nobody else is online right now. ' +
-        'Leave this tab open — you will appear to anyone who joins, and they to you.</p></div>';
+      notice('friend-notice', 'bad', 'Could not read your friends list: ' + esc(e.message));
       return;
     }
 
-    $('#players-list').innerHTML = others
-      .map(function (p) {
-        const hosting = p.status === 'hosting' && p.has_code;
-        return (
-          '<div class="srv" data-session="' + esc(p.session_id) + '">' +
-          '<div class="dot ' + (hosting ? 'ok' : '') + '"></div>' +
-          '<div>' +
-          '<div class="srv-name">' + esc(p.username) + ' ' + statusPill(p) + '</div>' +
-          '<div class="srv-meta">' +
-          (hosting
-            ? 'Hosting ' + (p.world_name ? '<strong>' + esc(p.world_name) + '</strong>' : 'a world') +
-              (p.open_join ? ' · <span class="ok">open to anyone</span>' : ' · asks first')
-            : '<span class="muted">Not hosting a world</span>') +
-          '</div></div>' +
-          '<div class="srv-acts">' +
-          (hosting && p.open_join && p.join_code
-            ? '<button class="btn slim primary" data-act="copy" data-code="' + esc(p.join_code) + '">Copy join code</button>'
-            : hosting
-              ? '<button class="btn slim primary" data-act="ask">Ask to join</button>'
-              : '<button class="btn slim" disabled title="They are not hosting a world">Ask to join</button>') +
-          '</div></div>'
-        );
-      })
-      .join('');
-  }
+    const accepted = rows.filter((r) => r.state === 'accepted');
+    const incoming = rows.filter((r) => r.state === 'pending' && r.direction === 'incoming');
+    const outgoing = rows.filter((r) => r.state === 'pending' && r.direction === 'outgoing');
+    $('#friends-count').textContent = String(accepted.length);
 
-  async function refreshRequests() {
-    let rows;
-    try {
-      rows = await Lb.inbox();
-    } catch (e) {
-      notice('req-notice', 'bad', 'Could not read your requests: ' + esc(e.message));
-      return;
-    }
-    const live = rows.filter((r) => r.state !== 'cancelled');
-    $('#req-count').textContent = String(live.filter((r) => r.state === 'pending').length);
+    const act = Acc.activity();
+    $('#f-world-name').value = act.world || '';
+    $('#f-world-code').value = act.code || '';
 
-    if (!live.length) {
-      $('#req-list').innerHTML =
-        '<div class="empty"><p>No requests. Ask someone who is hosting, or wait for someone to ask you.</p></div>';
-      return;
+    const card = function (r, body, acts) {
+      const dot = r.state !== 'accepted' ? 'busy' : r.online ? 'ok' : '';
+      return '<div class="srv" data-id="' + esc(r.friendship_id) + '">' +
+        '<div class="dot ' + dot + '"></div>' +
+        '<div><div class="srv-name">' + esc(r.username) +
+        (r.state === 'accepted' && r.online ? ' <span class="pill ok">online</span>' : '') +
+        '</div><div class="srv-meta">' + body + '</div></div>' +
+        '<div class="srv-acts">' + acts + '</div></div>';
+    };
+
+    let html = '';
+
+    if (incoming.length) {
+      html += '<h3 style="margin:4px 0 10px">Waiting for you</h3>' + incoming.map((r) =>
+        card(r, '<strong>' + esc(r.username) + '</strong> wants to be friends',
+          '<button class="btn slim primary" data-act="accept">Accept</button>' +
+          '<button class="btn slim ghost danger" data-act="decline">No thanks</button>')
+      ).join('');
     }
 
-    $('#req-list').innerHTML = live
-      .map(function (r) {
-        const incoming = r.direction === 'incoming';
-        let meta, acts = '';
-        if (r.state === 'pending') {
-          meta = incoming
-            ? '<strong>' + esc(r.other_name) + '</strong> wants to join your world'
-            : 'Waiting for <strong>' + esc(r.other_name) + '</strong> to answer';
-          acts = incoming
-            ? '<button class="btn slim primary" data-act="accept">Let them in</button>' +
-              '<button class="btn slim ghost danger" data-act="decline">No thanks</button>'
-            : '<button class="btn slim ghost" data-act="withdraw">Withdraw</button>';
-        } else if (r.state === 'accepted') {
-          meta = incoming
-            ? 'You let <strong>' + esc(r.other_name) + '</strong> in'
-            : '<strong>' + esc(r.other_name) + '</strong> let you in';
-          acts = r.join_code && !incoming
-            ? '<button class="btn slim primary" data-act="copy" data-code="' + esc(r.join_code) + '">Copy join code</button>'
-            : '';
+    if (accepted.length) {
+      html += '<h3 style="margin:16px 0 10px">Friends</h3>' + accepted.map(function (r) {
+        let body, acts = '';
+        if (!r.online) {
+          body = '<span class="muted">Offline · last seen ' + esc(when(r.last_seen)) + '</span>';
+        } else if (r.status === 'hosting' && r.join_code) {
+          body = 'Hosting <strong>' + esc(r.world_name || 'a world') + '</strong>' +
+                 (r.version ? ' on ' + esc(r.version) : '');
+          acts = '<button class="btn slim primary" data-act="code" data-code="' + esc(r.join_code) + '">Copy join code</button>';
+        } else if (r.server_addr) {
+          body = 'Playing on <span class="mono">' + esc(r.server_addr) + '</span>';
+          acts = '<button class="btn slim primary" data-act="joinserver" data-addr="' + esc(r.server_addr) + '">Join them</button>';
         } else {
-          meta = incoming
-            ? 'You declined <strong>' + esc(r.other_name) + '</strong>'
-            : '<strong>' + esc(r.other_name) + '</strong> declined';
+          body = '<span class="muted">Online' + (r.version ? ' on ' + esc(r.version) : '') +
+                 ' · not in a world you can join</span>';
         }
-        const cls = r.state === 'accepted' ? 'ok' : r.state === 'declined' ? 'bad' : 'busy';
-        return (
-          '<div class="srv" data-id="' + esc(r.id) + '">' +
-          '<div class="dot ' + cls + '"></div>' +
-          '<div><div class="srv-name">' + (incoming ? 'Request from ' : 'Your request to ') + esc(r.other_name) + '</div>' +
-          '<div class="srv-meta">' + meta + '</div>' +
-          (r.state === 'accepted' && r.join_code && !incoming
-            ? '<div class="srv-addr">Code: ' + esc(r.join_code) + '</div>'
-            : '') +
-          '</div><div class="srv-acts">' + acts + '</div></div>'
-        );
-      })
-      .join('');
+        return card(r, body, acts + '<button class="btn slim ghost danger" data-act="remove">Remove</button>');
+      }).join('');
+    }
+
+    if (outgoing.length) {
+      html += '<h3 style="margin:16px 0 10px">Asked, not answered</h3>' + outgoing.map((r) =>
+        card(r, 'Waiting for <strong>' + esc(r.username) + '</strong>',
+          '<button class="btn slim ghost" data-act="remove">Withdraw</button>')
+      ).join('');
+    }
+
+    if (!html) {
+      html = '<div class="empty"><p>No friends yet. Add someone by their name or friend code above.</p></div>';
+    }
+    $('#friend-list').innerHTML = html;
   }
 
-  async function pollLobby() {
-    if (!Lb.available()) return;
-    await refreshPlayers();
-    if (Lb.isOnline()) await refreshRequests();
-    if (pollTimer) clearTimeout(pollTimer);
-    /* Only poll while this tab is the one being looked at. */
-    if ($('#v-players').classList.contains('on') && !document.hidden) {
-      pollTimer = setTimeout(pollLobby, (O.config.lobby.pollMs) || 5000);
+  function when(ts) {
+    const d = Date.now() - new Date(ts).getTime();
+    const m = Math.round(d / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + ' min ago';
+    const h = Math.round(m / 60);
+    if (h < 24) return h + (h === 1 ? ' hour ago' : ' hours ago');
+    const dd = Math.round(h / 24);
+    return dd + (dd === 1 ? ' day ago' : ' days ago');
+  }
+
+  async function pollFriends() {
+    if (!Acc.signedIn()) return;
+    await renderFriends();
+    if (friendTimer) clearTimeout(friendTimer);
+    if ($('#v-friends').classList.contains('on') && !document.hidden) {
+      friendTimer = setTimeout(pollFriends, (O.config.api.pollMs) || 5000);
     }
   }
 
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden && $('#v-players').classList.contains('on')) pollLobby();
+    if (!document.hidden && $('#v-friends').classList.contains('on')) pollFriends();
   });
 
-  $('#btn-go-online').addEventListener('click', async function () {
-    const err = $('#lobby-error');
+  $('#btn-friend-add').addEventListener('click', async function () {
+    const who = $('#f-friend').value.trim();
+    if (!who) return;
     this.disabled = true;
-    const res = await Lb.goOnline($('#f-lobby-name').value);
+    const res = await Acc.addFriend(who);
     this.disabled = false;
     if (!res.ok) {
-      err.textContent = res.error;
-      err.classList.remove('hide');
+      notice('friend-notice', 'bad', esc(res.error));
       return;
     }
-    err.classList.add('hide');
-    renderLobby();
-    pollLobby();
+    $('#f-friend').value = '';
+    notice('friend-notice', 'ok', res.result === 'accepted'
+      ? 'You and <strong>' + esc(res.username) + '</strong> are now friends — they had already asked you.'
+      : 'Asked <strong>' + esc(res.username) + '</strong>. They will see it next time they look.');
+    renderFriends();
   });
 
-  $('#btn-go-offline').addEventListener('click', async function () {
-    this.disabled = true;
-    await Lb.goOffline();
-    this.disabled = false;
-    if (pollTimer) clearTimeout(pollTimer);
-    renderLobby();
-    refreshPlayers();
-  });
+  $('#f-friend').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#btn-friend-add').click(); });
 
-  $('#btn-refresh-players').addEventListener('click', () => pollLobby());
+  $('#friend-list').addEventListener('click', async function (ev) {
+    const btn = ev.target.closest('button[data-act]');
+    if (!btn) return;
+    const id = btn.closest('.srv').dataset.id;
+    const act = btn.dataset.act;
+
+    if (act === 'code') {
+      try {
+        await navigator.clipboard.writeText(btn.dataset.code);
+        notice('friend-notice', 'ok',
+          '<strong>Join code copied.</strong> In the game: Multiplayer, then paste it in — or wait for their world to appear in the list.');
+      } catch (e) {
+        notice('friend-notice', 'ok', '<strong>Join code:</strong> <span class="mono">' + esc(btn.dataset.code) + '</span>');
+      }
+      return;
+    }
+    if (act === 'joinserver') {
+      const addr = btn.dataset.addr;
+      const known = S.all().find((e) => e.addr === addr);
+      if (!known) S.add('Friend’s server', addr);
+      renderList();
+      launch(S.all().find((e) => e.addr === addr) || null);
+      return;
+    }
+
+    btn.disabled = true;
+    let res;
+    if (act === 'accept') res = await Acc.respondFriend(id, true);
+    else if (act === 'decline') res = await Acc.respondFriend(id, false);
+    else res = await Acc.removeFriend(id);
+    btn.disabled = false;
+    if (!res.ok) notice('friend-notice', 'bad', esc(res.error));
+    else notice('friend-notice', '', '');
+    renderFriends();
+  });
 
   $('#btn-save-world').addEventListener('click', async function () {
     const err = $('#world-error');
     const code = $('#f-world-code').value.trim();
     if (!code) {
-      err.textContent = 'Paste the join code the game gave you, or press Stop hosting.';
+      err.textContent = 'Paste the join code the game gave you, or press Stop sharing.';
       err.classList.remove('hide');
       return;
     }
     err.classList.add('hide');
-    const res = await Lb.setActivity({
-      world: $('#f-world-name').value.trim(),
-      code: code,
-      open: $('#f-world-open').checked,
-      status: 'hosting'
+    const res = await Acc.setActivity({
+      world: $('#f-world-name').value.trim(), code: code, status: 'hosting', version: Vs.selected().id
     });
     if (!res.ok) {
       err.textContent = res.error;
       err.classList.remove('hide');
       return;
     }
-    renderLobby();
-    pollLobby();
+    notice('friend-notice', 'ok', 'Your friends can see it now.');
+    renderFriends();
   });
 
   $('#btn-clear-world').addEventListener('click', async function () {
-    await Lb.setActivity({ world: '', code: '', open: false, status: 'idle' });
-    renderLobby();
-    pollLobby();
+    await Acc.setActivity({ world: '', code: '', status: 'idle' });
+    notice('friend-notice', '', '');
+    renderFriends();
   });
-
-  $('#players-list').addEventListener('click', async function (ev) {
-    const btn = ev.target.closest('button[data-act]');
-    if (!btn) return;
-    const card = btn.closest('.srv');
-
-    if (btn.dataset.act === 'copy') {
-      await copyCode(btn.dataset.code, 'players-notice');
-      return;
-    }
-    if (btn.dataset.act === 'ask') {
-      btn.disabled = true;
-      const res = await Lb.ask(card.dataset.session);
-      btn.disabled = false;
-      notice('players-notice', res.ok ? 'ok' : 'bad',
-        res.ok
-          ? 'Asked to join. Watch the <strong>Requests</strong> section above for their answer.'
-          : esc(res.error));
-      if (res.ok) refreshRequests();
-    }
-  });
-
-  $('#req-list').addEventListener('click', async function (ev) {
-    const btn = ev.target.closest('button[data-act]');
-    if (!btn) return;
-    const id = btn.closest('.srv').dataset.id;
-    const act = btn.dataset.act;
-
-    if (act === 'copy') {
-      await copyCode(btn.dataset.code, 'req-notice');
-      return;
-    }
-    btn.disabled = true;
-    let res;
-    if (act === 'accept') res = await Lb.respond(id, true);
-    else if (act === 'decline') res = await Lb.respond(id, false);
-    else res = await Lb.cancel(id);
-    btn.disabled = false;
-    if (!res.ok) notice('req-notice', 'bad', esc(res.error));
-    else if (act === 'accept') notice('req-notice', 'ok', 'They can see your join code now.');
-    else notice('req-notice', '', '');
-    refreshRequests();
-  });
-
-  async function copyCode(code, where) {
-    try {
-      await navigator.clipboard.writeText(code);
-      notice(where, 'ok',
-        '<strong>Join code copied.</strong> In the game: Multiplayer, then paste it into the join-code box. ' +
-        'The world may also just appear in the list by itself.');
-    } catch (e) {
-      notice(where, 'ok', '<strong>Join code:</strong> <span class="mono">' + esc(code) + '</span>');
-    }
-  }
 
   /* ============================== launching ============================== */
   async function launch(entry) {
@@ -1062,7 +1091,7 @@
       if (ts.installed && ts.count) {
         console.info('[Orion] ' + ts.count + ' ICE server(s) applied to the game (' + ts.mode + ')');
       }
-      if (Lb.isOnline()) Lb.setActivity({ status: Lb.me().code ? 'hosting' : 'playing' });
+      Acc.setActivity({ status: Acc.activity().code ? 'hosting' : 'playing', version: Vs.selected().id, server: entry ? entry.addr : null });
       O.stopStars && O.stopStars();
       /* The client paints over the boot screen itself; drop it once the
        * canvas has had a frame to appear. */
@@ -1095,14 +1124,12 @@
 
   $('#btn-launch').addEventListener('click', () => launch(null));
   $('#btn-launch-2').addEventListener('click', () => launch(null));
-  $('#btn-goto-friends').addEventListener('click', () => show('friends'));
+  $('#btn-goto-together').addEventListener('click', () => show('together'));
   $('#btn-goto-servers').addEventListener('click', () => show('servers'));
   $('#game-exit').addEventListener('click', async () => {
     if (!confirm('Leave the game and go back to the launcher? Anything unsaved in a singleplayer world may be lost.')) return;
     /* Stop advertising a world that is about to stop existing. */
-    if (Lb.isOnline()) {
-      try { await Lb.setActivity({ status: 'idle', world: '', code: '', open: false }); } catch (e) { /* reloading anyway */ }
-    }
+    try { await Acc.setActivity({ status: 'idle', world: '', code: '', server: '' }); } catch (e) { /* reloading anyway */ }
     location.reload();
   });
 
@@ -1124,8 +1151,37 @@
     show('servers');
   } else {
     const h = (location.hash || '').replace('#', '');
-    show(['play', 'servers', 'players', 'friends', 'host', 'setup'].includes(h) ? h : 'play');
+    show(['play', 'servers', 'friends', 'together', 'host', 'setup'].includes(h) ? h : 'play');
   }
 
   refreshBundle();
+
+  /* The launcher is behind an account, so decide that before anything else is
+   * worth looking at. A stored token is only a claim until the server agrees,
+   * so resume() is what actually settles it. */
+  (async function boot() {
+    if (!Acc.available()) {
+      /* No backend configured: run without accounts rather than locking
+       * everyone out of a launcher that would otherwise work. */
+      gateOn(false);
+      ['friends'].forEach(function (v) {
+        const tab = document.querySelector('nav.tabs button[data-view="' + v + '"]');
+        if (tab) tab.style.display = 'none';
+      });
+      const mods = document.querySelector('nav.tabs a[href="mods/"]');
+      if (mods) mods.style.display = 'none';
+      return;
+    }
+
+    gateOn(true);
+    renderGate('Checking your session…', 'ok');
+    const res = await Acc.resume();
+    if (res.ok) {
+      renderGate(null);
+      afterSignIn();
+    } else {
+      renderGate(null);
+      $('#g-user').focus();
+    }
+  })();
 })();

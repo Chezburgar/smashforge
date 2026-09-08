@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mod Store — Orion Client</title>
+<meta name="description" content="Resource packs for Eaglercraft, checked for compatibility before they are published.">
+<link rel="icon" href="../assets/orion-logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../css/orion.css">
+<link rel="stylesheet" href="mods.css">
+</head>
+<body>
+
+<div id="sky"></div>
+<canvas id="stars"></canvas>
+
+<div id="shell">
+  <header class="top">
+    <a class="brand" href="../">
+      <img src="../assets/orion-logo.svg" alt="Orion Client logo">
+      <div>
+        <h1>Orion<span>&nbsp;Client</span></h1>
+        <div class="tag">Mod Store</div>
+      </div>
+    </a>
+    <div id="whoami"></div>
+    <nav class="tabs">
+      <a class="btn slim ghost" href="../">← Launcher</a>
+    </nav>
+  </header>
+
+  <div class="hero-mods card">
+    <div>
+      <h2>Resource packs</h2>
+      <p class="lede">
+        Retextures, colour swaps and sound replacements for Eaglercraft. Every pack here has
+        been read and checked against the versions Orion runs, so what is listed as working,
+        works.
+      </p>
+      <div class="filters" id="filters">
+        <button class="chip on" data-filter="all">Everything</button>
+        <button class="chip" data-filter="1.8">Works on 1.8</button>
+        <button class="chip" data-filter="1.12.2">Works on 1.12.2</button>
+      </div>
+    </div>
+    <div class="hero-art"><img src="../assets/orion-logo.svg" alt=""></div>
+  </div>
+
+  <div id="store-notice"></div>
+
+  <div class="mod-grid" id="mod-grid">
+    <div class="empty" style="grid-column:1/-1"><p>Loading…</p></div>
+  </div>
+
+  <!-- Only the owner ever sees this. -->
+  <div class="card" id="upload-card" style="display:none">
+    <h2>Publish a pack <span class="pill ok">owner</span></h2>
+    <p>
+      Drop a <code>.zip</code> in and it is read here in your browser before anything is sent:
+      the layout, the <code>pack.mcmeta</code>, the textures and which versions it declares.
+      A pack that would not load cannot be published by accident.
+    </p>
+
+    <div id="drop" class="drop">
+      <input type="file" id="file" accept=".zip,application/zip" hidden>
+      <p class="drop-main">Drop a resource pack here</p>
+      <p class="drop-sub">or <button class="btn slim" id="btn-pick">choose a file</button></p>
+    </div>
+
+    <div id="report"></div>
+
+    <div id="publish-form" style="display:none">
+      <div class="form-grid">
+        <label class="field">
+          <span>Name</span>
+          <input type="text" id="m-title" maxlength="60" placeholder="Soft Pastels">
+        </label>
+        <label class="field">
+          <span>One line about it</span>
+          <input type="text" id="m-summary" maxlength="240" placeholder="Muted colours and rounded edges">
+        </label>
+      </div>
+      <label class="field">
+        <span>Details (optional)</span>
+        <textarea id="m-body" maxlength="4000" placeholder="What it changes, who made it, anything worth knowing."></textarea>
+      </label>
+      <div id="publish-error" class="note bad hide"></div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-publish">Publish</button>
+        <button class="btn ghost" id="btn-cancel-upload">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Using a pack</h3>
+    <ol class="steps">
+      <li>
+        <h4>Download it</h4>
+        <p>Press <strong>Download</strong> on any pack. You get the <code>.zip</code> exactly as it was published.</p>
+      </li>
+      <li>
+        <h4>Load it in the game</h4>
+        <p>
+          <a href="../">Launch the client</a>, then <em>Options</em> → <em>Resource Packs</em> and
+          add the zip. It stays in that browser afterwards.
+        </p>
+      </li>
+    </ol>
+    <div class="note">
+      Match the version: a pack listed for 1.8 will not load on 1.12.2, and the other way
+      round. That is what the badges on each pack are telling you.
+    </div>
+  </div>
+
+  <footer class="foot">
+    <p>
+      <strong>Mod Store</strong> — part of Orion Client. Packs are read in your browser before
+      upload; only the owner can publish.
+    </p>
+  </footer>
+</div>
+
+<script src="../js/config.js"></script>
+<script src="../js/account.js"></script>
+<script src="js/pack.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
