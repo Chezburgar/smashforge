@@ -14,7 +14,10 @@ orion/discs/js/pack.js   lays the files out as a resource pack
 ```
 
 It leans on `orion/js/zip.js` to build the zip and `orion/js/packs.js` to write
-the pack straight into the client's own storage.
+the pack into the client's own storage **and switch it on** — installing without
+selecting leaves the discs and the printer sitting there doing nothing, which is
+exactly how this looked broken for a while. See the README at the repository
+root for how the selection is stored.
 
 ## Where the music comes from
 

@@ -209,11 +209,33 @@ page served over plain `http://` may open a plain `ws://` socket, so
 `node tools/serve.js . 8123` and `http://localhost:8123/orion/` reaches an
 untouched server. Only for whoever is at that computer, but it works.
 
-### Installing a pack without a file picker
+### Installing a pack, and switching it on
 
-Orion writes resource packs straight into the client's own storage, so printing
-discs or applying a theme is one button rather than a download, a file picker
-and four menus.
+Orion writes resource packs straight into the client's own storage and adds
+them to the game's selected packs, so printing discs or applying a theme is one
+button rather than a download, a file picker and four menus.
+
+Doing only the first half of that was a real bug for a while: a pack in the
+manifest shows up under *Available* in the game's Resource Packs screen and
+does **nothing at all** until somebody moves it to *Selected*. So discs, the
+printer block and the whole menu theme looked like they were being ignored —
+they were installed and switched off.
+
+Which packs are on is recorded somewhere else entirely from the packs
+themselves: the client keeps a vanilla-style `options.txt`, gzipped and
+base64'd, in `localStorage["<localStorageNamespace>.g"]`, and the line that
+matters is
+
+```
+resourcePacks:["orion-theme","my-records"]
+```
+
+exactly as Minecraft writes it. That was found by selecting a pack through the
+game's own screen and diffing `localStorage`. `js/packs.js` now edits that line
+on install, creates the file if the client has never run, leaves every other
+setting alone, and deselects a pack when it is removed so the client does not
+complain about a missing one on every start. It reports whether it managed it,
+and the pages say plainly which packs are on and which are merely installed.
 
 That is possible because the game runs inside this page: the IndexedDB database
 it keeps packs in belongs to this origin. The layout was read off a real
@@ -235,9 +257,11 @@ loose files afterwards. Import also writes two files that are in no zip —
 filesystem cannot list a directory, so the client indexes those up front.
 `orion/js/packs.js` writes the same rows, including those two.
 
-Verified end to end: a pack written this way is listed by the game, selectable
-through its own Resource Packs screen, and its textures are applied — the menu
-backdrop changes to the one in the pack.
+Verified end to end on a browser profile that had never run the client:
+install the theme and a disc pack from their own pages, launch, and **without
+opening a single in-game menu** the menus are themed, the printed disc is in the
+creative inventory as "Orion – Inworld Test" with its own artwork, and the
+printer block is there as "Orion Disc Printer".
 
 The game reads that manifest while it starts, so a pack installed while the
 client is already running appears the next time it launches; Orion says so

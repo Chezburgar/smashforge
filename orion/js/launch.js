@@ -141,8 +141,10 @@ window.ORION = window.ORION || {};
       container: containerId,
       worldsDB: v.worldsDB,
       /* Named explicitly rather than left to the build's default, because
-       * js/packs.js writes into that exact database to install a pack. */
+       * js/packs.js writes into that exact database to install a pack, and
+       * into "<localStorageNamespace>.g" to switch one on. */
       resourcePacksDB: v.packsDB || 'resourcePacks',
+      localStorageNamespace: v.storageNamespace || '_eaglercraftX',
       demoMode: false,
       servers: optsServers(),
       relays: O.Relays.forOpts()

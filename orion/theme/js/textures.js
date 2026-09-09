@@ -184,34 +184,56 @@ window.ORION_THEME = window.ORION_THEME || {};
   NS.textWidth = textWidth;
 
   /* ------------------------------------------------------------------ title
-   * Sleek rather than chiselled: no extrusion, no outline, wide letter
-   * spacing, and a thin accent rule under the word — the launcher's own
-   * heading treatment. Vanilla's logo is a stone slab with a drop shadow; this
-   * deliberately is not.
+   * Drawn with a real typeface rather than the 3x5 pixel alphabet below. The
+   * sheet is 256x256 for a wordmark that is only 44 tall, so there is room for
+   * proper letterforms, and pixel-art capitals were most of what made the
+   * menu still look like Minecraft.
    *
    * The layout constraint is the game's: 1.8 blits the title from two halves
-   * of one sheet, (0,0,155,44) then (0,45,155,44) beside it, so the wordmark
-   * is drawn once across a 310-wide strip and cut down the middle. That is the
+   * of one sheet, (0,0,155,44) then (0,45,155,44) beside it, so the wordmark is
+   * drawn once across a 310-wide strip and cut down the middle. That is the
    * only way to get letters that straddle the join.
    */
   NS.title = function (pal, word) {
-    const text = (word || 'ORION').toUpperCase().slice(0, 12);
+    const text = (word || 'ORION').toUpperCase().slice(0, 16);
     const strip = cv(310, 44);
+    const g = strip.g;
+    g.imageSmoothingEnabled = true;
 
-    /* Wide tracking is most of what makes it read as modern, so the gap gets
-     * its own share of the width rather than being a fraction of the glyph. */
-    const scale = Math.max(2, Math.min(6, Math.floor(292 / Math.max(1, textWidth(text, 1, 2)))));
-    const gap = Math.max(scale, Math.round(scale * 1.9));
-    const w = textWidth(text, scale, gap);
-    const x = Math.round((310 - w) / 2);
-    const y = Math.round((44 - 5 * scale) / 2) - 3;
+    /* Fit the word to the strip, then space it out: wide tracking is most of
+     * what reads as modern. Tracking is applied by drawing character by
+     * character, since canvas has no letter-spacing everywhere. */
+    let size = 30;
+    let track = Math.max(2, Math.round(size * 0.16));
+    const font = (px) => '700 ' + px + 'px "Rajdhani", "Segoe UI", system-ui, -apple-system, sans-serif';
+    const widthOf = (px, sp) => {
+      g.font = font(px);
+      let w = 0;
+      for (const ch of text) w += g.measureText(ch).width + sp;
+      return w - sp;
+    };
+    while (size > 8 && widthOf(size, track) > 286) {
+      size -= 1;
+      track = Math.max(2, Math.round(size * 0.16));
+    }
 
-    drawText(strip.g, text, x, y, scale, pal.text, null, gap);
+    const w = widthOf(size, track);
+    let x = Math.round((310 - w) / 2);
+    const baseline = 30;
 
-    /* A hairline under the word, in the accent, inset a little at each end. */
-    const ruleY = y + 5 * scale + Math.max(3, scale);
-    strip.g.fillStyle = pal.accent;
-    strip.g.fillRect(x, ruleY, w, Math.max(1, Math.round(scale / 3)));
+    g.font = font(size);
+    g.textBaseline = 'alphabetic';
+    for (const ch of text) {
+      g.fillStyle = pal.text;
+      g.fillText(ch, x, baseline);
+      x += g.measureText(ch).width + track;
+    }
+
+    /* A hairline under the word, in the accent — the launcher's own heading
+     * treatment, and the thing that makes it look designed rather than
+     * dropped in. */
+    g.fillStyle = pal.accent;
+    g.fillRect(Math.round((310 - w) / 2), baseline + 6, Math.round(w), 2);
 
     const out = cv(256, 256);
     out.g.drawImage(strip.c, 0, 0, 155, 44, 0, 0, 155, 44);
@@ -263,14 +285,24 @@ window.ORION_THEME = window.ORION_THEME || {};
     g.fillStyle = core;
     g.fillRect(cx - 26, cy - 26, 52, 52);
 
-    const text = (word || 'ORION').toUpperCase().slice(0, 12);
-    const scale = 3;
-    const gap = 6;
-    const w = textWidth(text, scale, gap);
-    drawText(g, text, Math.round((256 - w) / 2), 178, scale, pal.text, null, gap);
-    const sub = 'LOADING';
-    const sw = textWidth(sub, 2, 5);
-    drawText(g, sub, Math.round((256 - sw) / 2), 206, 2, pal.dim, null, 5);
+    /* Same typeface as the title, for the same reason. */
+    const label = (word || 'ORION').toUpperCase().slice(0, 16);
+    g.textBaseline = 'alphabetic';
+    const spaced = (str, px, weight, colour, y) => {
+      g.font = weight + ' ' + px + 'px "Rajdhani", "Segoe UI", system-ui, -apple-system, sans-serif';
+      const track = Math.max(2, Math.round(px * 0.18));
+      let total = 0;
+      for (const ch of str) total += g.measureText(ch).width + track;
+      total -= track;
+      let x = Math.round((256 - total) / 2);
+      g.fillStyle = colour;
+      for (const ch of str) {
+        g.fillText(ch, x, y);
+        x += g.measureText(ch).width + track;
+      }
+    };
+    spaced(label, 26, '700', pal.text, 196);
+    spaced('LOADING', 12, '600', pal.dim, 222);
     return c;
   };
 
@@ -477,6 +509,132 @@ window.ORION_THEME = window.ORION_THEME || {};
     button(86, { fill: pal.panel, alpha: 0.97, border: pal.accent, borderAlpha: 0.85, accent: pal.accent });
 
     return c;
+  };
+
+  /* ------------------------------------------------------------------- font
+   * The single most Minecrafty thing left on a themed menu is the lettering,
+   * and the lettering is a texture like everything else:
+   * textures/font/ascii.png, a 16x16 grid of cells where the cell index is the
+   * character code. So cell 65 is 'A', and drawing into it by char code needs
+   * no table.
+   *
+   * Vanilla's sheet is 128x128 — 8x8 per cell — and the game works out each
+   * glyph's advance width by scanning its cell for the rightmost pixel that is
+   * not transparent, which means a font drawn here is measured automatically
+   * and needs no widths file.
+   *
+   * This one is 512x512, so 32x32 per cell. The game draws it at the same size
+   * on screen either way, so the extra resolution is spent on detail: at 8x8
+   * every letter has to be pixel art, and at 32x32 a real typeface fits, edges
+   * and all. That is what stops the menus reading as Minecraft.
+   *
+   * Drawn with the browser's own UI font rather than a font file, because a
+   * font file would have to be fetched and this site fetches nothing.
+   */
+  const FONT_CELL = 32;
+  const FONT_SHEET = FONT_CELL * 16;
+
+  NS.font = function (pal) {
+    const { c, g } = cv(FONT_SHEET, FONT_SHEET);
+    g.imageSmoothingEnabled = true;
+    g.clearRect(0, 0, FONT_SHEET, FONT_SHEET);
+
+    /* Pure white: the game tints text by multiplying, so anything else here
+     * would fight every colour code in the game. */
+    g.fillStyle = '#ffffff';
+    g.textBaseline = 'alphabetic';
+    g.textAlign = 'left';
+
+    /* Two things decide these numbers, and getting them wrong shows up as
+     * litter on every screen — which it did on the first attempt.
+     *
+     * The glyph has to fit its cell *including its descender*. The game slices
+     * the sheet into equal cells, so a 'p' whose tail hangs past the bottom of
+     * its cell reappears as a stray mark above the row below. Baseline at 26
+     * of 32 with a 19px face leaves room for the tail and still sits within a
+     * pixel of where vanilla puts its own.
+     *
+     * And the glyph must not touch the right edge, because the game works out
+     * each character's advance width by scanning its cell inward from the
+     * right for the first pixel that is not transparent. A glyph that reaches
+     * the edge measures as a full cell wide and the text comes out gappy.
+     */
+    const size = 19;
+    const baseline = 26;
+    const margin = 2;
+    g.font = '600 ' + size + 'px "Rajdhani", "Segoe UI", system-ui, -apple-system, sans-serif';
+
+    const draw = (code) => {
+      const ch = String.fromCharCode(code);
+      const col = code % 16;
+      const row = Math.floor(code / 16);
+      const x = col * FONT_CELL;
+      const y = row * FONT_CELL;
+
+      /* Clipped to the cell as insurance: whatever the metrics say, nothing
+       * from this character can land in another one's box. */
+      g.save();
+      g.beginPath();
+      g.rect(x, y, FONT_CELL, FONT_CELL);
+      g.clip();
+
+      /* Squeeze the few glyphs that are wider than the cell allows rather
+       * than letting them be cut off. */
+      const w = g.measureText(ch).width;
+      const room = FONT_CELL - margin * 2;
+      if (w > room && w > 0) {
+        const k = room / w;
+        g.translate(x + margin, y + baseline);
+        g.scale(k, 1);
+        g.fillText(ch, 0, 0);
+      } else {
+        g.fillText(ch, x + margin, y + baseline);
+      }
+      g.restore();
+    };
+
+    /* Printable ASCII, then Latin-1 so accented names do not fall back to a
+     * different font mid-word. Codes below 32 are control characters and stay
+     * empty, which is what vanilla has there too. Space is left blank: the
+     * game gives an empty cell a fixed width of its own. */
+    for (let code = 33; code <= 126; code++) draw(code);
+    for (let code = 161; code <= 255; code++) draw(code);
+
+    /* Antialiasing leaves a haze of nearly-invisible pixels past the edge of
+     * every glyph, and the width scan counts those, so letters end up spaced
+     * as if they were all as wide as the widest. Clearing the faintest pixels
+     * makes the measured width the real one while leaving the smooth edge
+     * that makes this look like type rather than pixel art. */
+    const img = g.getImageData(0, 0, FONT_SHEET, FONT_SHEET);
+    const d = img.data;
+    for (let i = 3; i < d.length; i += 4) {
+      if (d[i] < 40) d[i] = 0;
+    }
+    g.putImageData(img, 0, 0);
+
+    return c;
+  };
+
+  /* ---------------------------------------------------------------- splashes
+   * The yellow line that flops over the logo comes from
+   * assets/minecraft/texts/splashes.txt — one splash per line, picked at
+   * random — so a pack can replace it. Vanilla's are Minecraft in-jokes, which
+   * is exactly the wrong note for a themed menu.
+   */
+  NS.splashes = function (word) {
+    const name = (word || 'ORION').toUpperCase().slice(0, 16);
+    return [
+      name,
+      'Runs in a tab',
+      'No install, no launcher',
+      'Bring your friends',
+      'Now with proximity voice',
+      'Print your own records',
+      'Built on GitHub Pages',
+      'Same port as Java',
+      'wss:// or nothing',
+      'Made in a browser'
+    ].join('\n') + '\n';
   };
 
   NS.toPng = function (canvas) {

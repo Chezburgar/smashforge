@@ -508,8 +508,19 @@
        * files, so handing it the list skips packing and unpacking entirely. */
       const files = await filesFor(r);
       const res = await O.Packs.install({ version: r.version, title: r.title, files: files });
-      notice('#print-result', 'ok',
-        'Installed as <strong>' + esc(res.folder) + '</strong> — ' + res.files + ' files.');
+      if (res.enabled) {
+        notice('#print-result', 'ok',
+          '<strong>Done — it is switched on.</strong> Installed as <span class="mono">' + esc(res.folder) +
+          '</span> (' + res.files + ' files) and added to the game\u2019s selected resource packs, so there ' +
+          'is nothing to turn on by hand. <strong>Start the client</strong> (or restart it if it is already ' +
+          'running) and the discs and the printer are there.');
+      } else {
+        notice('#print-result', 'warn',
+          'Installed as <span class="mono">' + esc(res.folder) + '</span> (' + res.files + ' files), but Orion ' +
+          'could not switch it on for you' + (res.enableReason ? ' (' + esc(res.enableReason) + ')' : '') +
+          '. Launch the client, then <em>Options → Resource Packs</em>, hover the pack and choose ' +
+          '<em>Select this resource pack</em> — until you do, it is installed and doing nothing.');
+      }
       await showInstalled();
     } catch (e) {
       printError(e.message || String(e));
@@ -546,11 +557,15 @@
     if (!O.Packs.supported('1.8')) { box.style.display = 'none'; return; }
     const list = await O.Packs.list('1.8');
     if (!list.length) { box.style.display = 'none'; return; }
+    const on = await O.Packs.selected('1.8');
     box.style.display = '';
-    box.innerHTML = '<strong>In your game already:</strong> ' +
-      list.map((e) => '<span class="mono">' + esc(e.folder) + '</span>').join(', ') +
-      '. Turn a pack on under <em>Options → Resource Packs</em>. If the client is open right now, ' +
-      'it will see a new pack the next time it starts.';
+    box.innerHTML = '<strong>In your game:</strong> ' +
+      list.map(function (e) {
+        const live = on.indexOf(e.folder) >= 0;
+        return '<span class="mono">' + esc(e.folder) + '</span> <span class="pill ' +
+          (live ? 'ok">on' : 'warn">off') + '</span>';
+      }).join(', ') +
+      '. Anything marked <em>off</em> is installed but not selected, so the game ignores it.';
   }
 
   /* -------------------------------------------------------------- publishing */

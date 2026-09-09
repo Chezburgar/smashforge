@@ -70,6 +70,14 @@
       </div>
 
       <label class="checkline">
+        <input type="checkbox" id="f-text" checked>
+        <span><strong>Replace the lettering.</strong> The pixel font is the most Minecraft-looking
+        thing left once the buttons are flat, and it is a texture like any other — this swaps it
+        for a real typeface at four times the resolution, and swaps the yellow Minecraft in-joke
+        over the logo for lines of our own. Affects text everywhere, in menus and in game.</span>
+      </label>
+
+      <label class="checkline">
         <input type="checkbox" id="f-widgets" checked>
         <span><strong>Restyle the buttons too.</strong> This redraws the whole widget sheet, which
         also holds the hotbar and the selected-slot outline — so your hotbar changes with it.
@@ -124,12 +132,15 @@
       <tr><td class="mono">gui/title/background/panorama_0…5.png</td><td>The world turning behind the main menu</td></tr>
       <tr><td class="mono">gui/options_background.png</td><td>The tiled backdrop on every other menu</td></tr>
       <tr><td class="mono">gui/widgets.png</td><td>Buttons, the hotbar and the selected-slot outline</td></tr>
+      <tr><td class="mono">font/ascii.png</td><td>Every letter the game draws, menus and in game</td></tr>
+      <tr><td class="mono">texts/splashes.txt</td><td>The yellow line flopped over the logo</td></tr>
     </table>
     <div class="note" style="margin-top:14px">
-      A resource pack can change pictures and sounds, and nothing else. The words on the buttons,
-      where they sit, and the launcher's own loading screen are not textures — the button text
-      comes from the language file and the layout is compiled into the client, which is signed and
-      cannot be edited without breaking that signature. Orion's own loading screen, the one before
+      A resource pack can change pictures, sounds and text files, and nothing else. Where things
+      sit is compiled into the client, which is signed and cannot be edited without breaking that
+      signature — so button positions and sizes stay as they are, and so do the client's own
+      corner labels (<em>Minecraft 1.8.8</em>, <em>EaglercraftX</em>, the Mojang copyright), which
+      are strings in the bundle rather than files in a pack. Orion's own loading screen, the one before
       the game appears, is part of the launcher and already matches.
     </div>
   </div>

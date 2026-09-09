@@ -20,8 +20,10 @@ orion/theme/js/app.js       the preview, the install, the download
 | `gui/title/background/panorama_0…5.png` | the world turning behind the main menu |
 | `gui/options_background.png` | the tiled backdrop on every other menu |
 | `gui/widgets.png` | buttons, the hotbar and the selected-slot outline |
+| `font/ascii.png` | every letter the game draws, in menus and in game |
+| `texts/splashes.txt` | the yellow line flopped over the logo |
 
-Two of those have layouts that cannot be guessed at:
+Three of those have layouts or rules that cannot be guessed at:
 
 **The title** is not one picture. 1.8 draws it from two blits of the same
 sheet — `(0,0,155,44)`, then `(0,45,155,44)` placed beside it — so the wordmark
@@ -34,8 +36,32 @@ states at `(0,46)`, `(0,66)` and `(0,86)`. Replacing it means drawing all of
 them, so restyling the buttons necessarily restyles the hotbar. The page says
 so and lets you turn it off.
 
-The letters come from a 3x5 pixel alphabet in `textures.js` rather than a font
-file, so the theme needs nothing from the network.
+**The font** is the one that most decides whether a menu still looks like
+Minecraft, and it is a texture like the rest: `font/ascii.png` is a 16x16 grid
+of cells where the cell index *is* the character code, so cell 65 is `A` and
+drawing by char code needs no table. Vanilla's sheet is 128x128 — 8x8 a
+glyph — and the game derives each character's advance width by scanning its
+cell inward from the right for the first pixel that is not transparent, so a
+font drawn here is measured automatically and needs no widths file.
+
+This one is 512x512, so 32x32 a cell. The game draws text the same size on
+screen either way, so the extra resolution goes on detail: at 8x8 every letter
+has to be pixel art, and at 32x32 a real typeface fits.
+
+Two rules fall out of how the game slices and measures that sheet, and breaking
+either one litters every screen — the first attempt broke both:
+
+- A glyph must fit its cell **including its descender**, or the tail of a `p`
+  reappears as a stray mark above the row below. Baseline at 26 of 32 with a
+  19px face leaves room, and every glyph is clipped to its cell as insurance.
+- A glyph must not reach the right edge, or it measures as a full cell wide and
+  the text comes out gappy. Antialiasing is the trap here: it leaves a haze of
+  nearly-invisible pixels past the edge of every letter and the width scan
+  counts them, so anything under alpha 40 is cleared. The edge stays smooth,
+  the measured width becomes the real one.
+
+Everything is drawn with the browser's own UI font rather than a font file,
+because a font file would have to be fetched and this site fetches nothing.
 
 ## What it cannot do
 
@@ -63,6 +89,11 @@ table above is untouched by any of this and comes out exactly as previewed.
 Orion's own loading screen — the one before the game appears, with the stages
 and the elapsed time — is part of the launcher, not the client, so it is not in
 this pack and already matches.
+
+The client's own corner labels — *Minecraft 1.8.8*, *EaglercraftX 1.8-u53*, the
+Mojang copyright, the *Collector's Edition* badge — are strings compiled into
+the bundle rather than files in a pack, so they stay. Everything else on the
+menu is ours.
 
 ## Verifying a change
 

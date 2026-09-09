@@ -35,6 +35,13 @@
  *             find the storage it writes into, so the two cannot drift apart.
  *             null means Orion has not read that build's pack storage and will
  *             not write to it.
+ *
+ *   storageNamespace
+ *             localStorage prefix the build keeps its settings under. Its
+ *             options file lives at "<namespace>.g" — gzipped, base64'd,
+ *             vanilla options.txt — and js/packs.js edits the resourcePacks
+ *             line in it to turn a pack on. Passed to the build as
+ *             localStorageNamespace for the same anti-drift reason.
  */
 window.ORION = window.ORION || {};
 (function (O) {
@@ -55,6 +62,7 @@ window.ORION = window.ORION || {};
       autoStart: true,
       worldsDB: 'worlds',
       packsDB: 'resourcePacks',
+      storageNamespace: '_eaglercraftX',
       isDefault: true
     },
     {
@@ -70,6 +78,7 @@ window.ORION = window.ORION || {};
       autoStart: false,
       worldsDB: 'worlds_1_12_2',
       packsDB: null,
+      storageNamespace: null,
       isDefault: false
     }
   ];

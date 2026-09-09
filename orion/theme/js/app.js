@@ -20,6 +20,7 @@
   let word = 'ORION';
   let seed = 20260908;
   let doWidgets = true;
+  let doText = true;
   let built = null;               /* the drawn canvases, cached until inputs change */
 
   function notice(where, kind, html) {
@@ -38,7 +39,8 @@
       mojang: T.mojang(pal, word),
       background: T.background(pal, seed),
       panorama: T.panorama(pal, seed, 256),
-      widgets: doWidgets ? T.widgets(pal) : null
+      widgets: doWidgets ? T.widgets(pal) : null,
+      font: doText ? T.font(pal) : null
     };
     return built;
   }
@@ -92,12 +94,27 @@
         g.fillStyle = 'rgba(160,160,160,0.85)';
         g.fillRect(x, y, bw, bh);
       }
+      /* The button text is the game's, drawn in whatever font is installed —
+       * which after this pack is this same typeface, so the preview is honest
+       * either way. */
       g.fillStyle = b.pal.text;
-      g.font = Math.round(9 * scale) + 'px "Rajdhani", system-ui, sans-serif';
+      g.font = (b.font ? '600 ' : '') + Math.round(9 * scale) + 'px ' +
+        (b.font ? '"Rajdhani", system-ui, sans-serif' : 'monospace');
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.fillText(label, W / 2, y + bh / 2 + 1);
     });
+
+    /* The splash line, at the angle the game draws it. Ours if the pack
+     * replaces splashes.txt, a vanilla in-joke if not. */
+    g.save();
+    g.translate(tx + tw * 0.82, ty + th * 0.92);
+    g.rotate(-0.34);
+    g.textAlign = 'center';
+    g.fillStyle = '#ffff55';
+    g.font = '600 ' + Math.round(9 * scale) + 'px "Rajdhani", system-ui, sans-serif';
+    g.fillText(b.font ? word.toUpperCase() : 'Also try Minecraft!', 0, 0);
+    g.restore();
 
     g.textAlign = 'left';
     g.fillStyle = b.pal.dim;
@@ -200,6 +217,11 @@
     previewAll();
   });
 
+  $('#f-text').addEventListener('change', function () {
+    doText = this.checked;
+    previewAll();
+  });
+
   /* ---------------------------------------------------------------- the pack */
 
   async function files(version) {
@@ -219,6 +241,10 @@
       out.push({ name: A + 'title/background/panorama_' + i + '.png', bytes: await T.toPng(b.panorama[i]) });
     }
     if (b.widgets) out.push({ name: A + 'widgets.png', bytes: await T.toPng(b.widgets) });
+    if (b.font) {
+      out.push({ name: 'assets/minecraft/textures/font/ascii.png', bytes: await T.toPng(b.font) });
+      out.push({ name: 'assets/minecraft/texts/splashes.txt', bytes: T.splashes(word) });
+    }
     return out;
   }
 
@@ -240,9 +266,17 @@
     try {
       const list = await files(version);
       const res = await O.Packs.install({ version: version, title: word + ' Theme', files: list });
-      notice('#pack-result', 'ok', 'Installed as <strong>' + esc(res.folder) + '</strong> — ' + res.files +
-        ' files. Turn it on in the game under <em>Options → Resource Packs</em>; if the client is open, ' +
-        'it will see the pack next time it starts.');
+      if (res.enabled) {
+        notice('#pack-result', 'ok', '<strong>Done — the theme is on.</strong> Installed as <span class="mono">' +
+          esc(res.folder) + '</span> (' + res.files + ' files) and selected in the game\u2019s resource packs, ' +
+          'so there is nothing to switch on by hand. <strong>Start the client</strong> — or restart it if it is ' +
+          'already running — and the menus look like this.');
+      } else {
+        notice('#pack-result', 'warn', 'Installed as <span class="mono">' + esc(res.folder) + '</span> (' +
+          res.files + ' files), but Orion could not switch it on for you' +
+          (res.enableReason ? ' (' + esc(res.enableReason) + ')' : '') + '. Launch the client, then ' +
+          '<em>Options → Resource Packs</em>, hover the pack and choose <em>Select this resource pack</em>.');
+      }
     } catch (e) {
       packError(e.message || String(e));
     } finally {

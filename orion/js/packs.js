@@ -32,6 +32,23 @@
  * The game reads that manifest while it starts up, so a pack installed while
  * the game is already running appears the next time it launches. Orion says so
  * rather than pretending it is instant.
+ *
+ * Installing is only half the job, and for a while Orion only did that half:
+ * a pack in the manifest shows up under *Available* in the game's Resource
+ * Packs screen and does nothing at all until somebody moves it to *Selected*.
+ * So discs, the printer block and the whole menu theme all appeared to be
+ * ignored — they were installed and switched off.
+ *
+ * Which packs are on is recorded somewhere else entirely: the client keeps a
+ * vanilla-style options.txt, gzipped, base64'd, in
+ * localStorage["<localStorageNamespace>.g"], and the line that matters is
+ *
+ *     resourcePacks:["orion-theme"]
+ *
+ * exactly as Minecraft writes it. That was found by selecting a pack through
+ * the game's own screen and diffing localStorage, not by reading tea leaves.
+ * So install() now edits that line too, and "put it in my game" means the
+ * thing is actually on the next time the game starts.
  */
 window.ORION = window.ORION || {};
 (function (O) {
@@ -42,6 +59,11 @@ window.ORION = window.ORION || {};
 
   const PREFIX = '_net_lax1dude_eaglercraft_v1_8_internal_PlatformFilesystem_1_8_8_';
   const MANIFEST = 'resourcepacks/manifest.json';
+
+  /* Where the client keeps its settings. `.g` is the game options; there are
+   * also `.p` (profile) and `.r`, which none of this touches. */
+  const SETTINGS_SUFFIX = '.g';
+  const PACKS_LINE = /^resourcePacks:.*$/m;
 
   /* 1.12.2 is a different client with its own filesystem prefix, and Orion has
    * not read its layout off a real install, so packsDB is null there: installing
@@ -125,6 +147,150 @@ window.ORION = window.ORION || {};
     return out.length ? out : ['minecraft'];
   }
 
+  /* ------------------------------------------------------- turning it on */
+
+  function settingsKey(version) {
+    const v = (O.Versions && O.Versions.get) ? O.Versions.get(version || '1.8') : null;
+    if (!v || !v.packsDB) return null;
+    return (v.storageNamespace || '_eaglercraftX') + SETTINGS_SUFFIX;
+  }
+
+  /* gzip both ways. The client writes gzip, so it reads gzip; CompressionStream
+   * has been in every browser that can run the game for years, but if it is
+   * missing we say so instead of writing something the client cannot read. */
+  async function gunzip(bytes) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  async function gzip(bytes) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+
+  const b64decode = (s) => {
+    const bin = atob(s);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  };
+  const b64encode = (bytes) => {
+    let bin = '';
+    /* In chunks: a 3 KB settings file is fine either way, but spreading a big
+     * array over apply() has blown the argument limit before. */
+    for (let i = 0; i < bytes.length; i += 8192) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    }
+    return btoa(bin);
+  };
+
+  /* The list as the options file has it. */
+  function readList(text) {
+    const m = PACKS_LINE.exec(text);
+    if (!m) return null;
+    const raw = m[0].slice('resourcePacks:'.length).trim();
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  P.selected = async function (version) {
+    const key = settingsKey(version);
+    if (!key) return [];
+    let raw = null;
+    try { raw = localStorage.getItem(key); } catch (e) { return []; }
+    if (!raw) return [];
+    try {
+      const text = new TextDecoder().decode(await gunzip(b64decode(raw)));
+      return readList(text) || [];
+    } catch (e) {
+      return [];
+    }
+  };
+
+  /* Add a pack to the selected list, keeping whatever was already there.
+   *
+   * Before the client has ever run there is no settings file, and a first-time
+   * player installing a pack and finding it off would be the same bug again —
+   * so one is created with just the line that matters. That is safe because
+   * the options file is read key by key and anything absent keeps the
+   * client's own default, exactly as in Minecraft; the file grows to its full
+   * shape the first time the client saves.
+   *
+   * What this deliberately does not touch is incompatibleResourcePacks, which
+   * is the client's own record of packs whose pack_format it did not like. */
+  P.enable = async function (folder, version) {
+    const key = settingsKey(version);
+    if (!key) return { ok: false, reason: 'unsupported-version' };
+    if (typeof CompressionStream !== 'function' || typeof DecompressionStream !== 'function') {
+      return { ok: false, reason: 'no-gzip' };
+    }
+
+    let raw = null;
+    try { raw = localStorage.getItem(key); } catch (e) { return { ok: false, reason: 'no-storage' }; }
+
+    let text;
+    let created = false;
+    if (!raw) {
+      text = 'resourcePacks:[]\n';
+      created = true;
+    } else {
+      try {
+        text = new TextDecoder().decode(await gunzip(b64decode(raw)));
+      } catch (e) {
+        return { ok: false, reason: 'unreadable-settings' };
+      }
+    }
+
+    let list = readList(text);
+    if (list === null) {
+      /* A settings file that somehow has no such line: append one rather than
+       * give up, since every other line is left exactly as it was. */
+      text = text.replace(/\n?$/, '\n') + 'resourcePacks:[]\n';
+      list = [];
+    }
+    if (list.indexOf(folder) >= 0) return { ok: true, already: true, created: created, list: list };
+
+    /* Appended rather than prepended: the client applies the list in order, so
+     * the last one in wins where two packs touch the same file, and a pack you
+     * just asked for should beat one from last week. */
+    const next = list.concat([folder]);
+    const updated = text.replace(PACKS_LINE, 'resourcePacks:' + JSON.stringify(next));
+
+    try {
+      localStorage.setItem(key, b64encode(await gzip(new TextEncoder().encode(updated))));
+    } catch (e) {
+      return { ok: false, reason: 'write-failed' };
+    }
+    return { ok: true, created: created, list: next };
+  };
+
+  P.disable = async function (folder, version) {
+    const key = settingsKey(version);
+    if (!key) return { ok: false, reason: 'unsupported-version' };
+    let raw = null;
+    try { raw = localStorage.getItem(key); } catch (e) { return { ok: false, reason: 'no-storage' }; }
+    if (!raw) return { ok: false, reason: 'no-settings-yet' };
+    let text;
+    try {
+      text = new TextDecoder().decode(await gunzip(b64decode(raw)));
+    } catch (e) {
+      return { ok: false, reason: 'unreadable-settings' };
+    }
+    const list = readList(text);
+    if (list === null) return { ok: false, reason: 'no-packs-line' };
+    const next = list.filter((x) => x !== folder);
+    const updated = text.replace(PACKS_LINE, 'resourcePacks:' + JSON.stringify(next));
+    try {
+      localStorage.setItem(key, b64encode(await gzip(new TextEncoder().encode(updated))));
+    } catch (e) {
+      return { ok: false, reason: 'write-failed' };
+    }
+    return { ok: true, list: next };
+  };
+
   /* files: [{ name, bytes }] — the same shape Zip.build takes, so a pack can be
    * installed and downloaded from one description of it. */
   P.install = async function (opts) {
@@ -189,7 +355,21 @@ window.ORION = window.ORION || {};
       store.put({ path: MANIFEST, data: enc.encode(JSON.stringify(manifest)).buffer });
 
       await done(tx);
-      return { folder: folder, files: files.length, packs: manifest.resourcePacks.length };
+
+      /* Installed but not selected is the same as not installed at all, so
+       * turning it on is part of installing it. The result says whether that
+       * worked, because the caller has to tell the truth about it. */
+      const on = opts.enable === false
+        ? { ok: false, reason: 'not-requested' }
+        : await P.enable(folder, version);
+
+      return {
+        folder: folder,
+        files: files.length,
+        packs: manifest.resourcePacks.length,
+        enabled: on.ok,
+        enableReason: on.ok ? null : on.reason
+      };
     } finally {
       db.close();
     }
@@ -233,6 +413,9 @@ window.ORION = window.ORION || {};
       manifest.resourcePacks = (manifest.resourcePacks || []).filter((e) => e && e.folder !== folder);
       store.put({ path: MANIFEST, data: enc.encode(JSON.stringify(manifest)).buffer });
       await done(tx);
+      /* Leaving a deleted pack in the selected list makes the client complain
+       * about a missing pack on every start. */
+      await P.disable(folder, version);
       return true;
     } finally {
       db.close();
