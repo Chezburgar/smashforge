@@ -333,23 +333,25 @@ window.ORION_THEME = window.ORION_THEME || {};
   };
 
   /* --------------------------------------------------------------- panorama
-   * One sky, six faces. Stars are placed on a sphere and then projected into
-   * whichever face they fall on, so a star never lands on two faces and the
-   * sky reads as continuous while the menu turns.
+   * The six faces of the skybox that turns behind the main menu: 0 north,
+   * 1 east, 2 south, 3 west, 4 up, 5 down.
    *
-   * Two things about this face are decided by the client rather than by taste,
-   * both established by installing probe packs and looking at the result:
+   * Two things about this face are the client's decision, not ours, and both
+   * were established by installing probe packs and looking rather than by
+   * guessing:
    *
    *   It blends the skybox heavily toward white. Six flat #ff00aa faces arrive
    *   on screen as pale pink; six transparent faces arrive as light grey. So a
-   *   near-black starfield — the obvious way to draw a space sky — comes out
-   *   flat grey, and darkening it does not help, because the floor is set by
-   *   the blend. Saturated mid-tones do survive: deep violet stays violet.
+   *   dark sky is not achievable here at all — the floor is set by the blend.
+   *   Saturated mid-tones survive it best.
    *
-   *   It blurs it. Individual pixels are gone by the time it is on screen, so
-   *   detail here is wasted work. What reads is large shapes and the overall
-   *   colour, which is why the nebula is big and soft and the stars are few and
-   *   fat rather than a thousand single pixels.
+   *   It blurs it, hard. Detail is gone by the time it is on screen.
+   *
+   * The first version fought both of those with a starfield and drifts of
+   * nebula, and the result was exactly what you would expect: pale lilac
+   * cloud. So this is a plain vertical gradient with a soft vignette and
+   * nothing else. A clean gradient is the one thing that survives a blur
+   * intact, and it is what the launcher's own background is.
    */
   NS.panorama = function (pal, seed, size) {
     const n = size || 256;
@@ -361,112 +363,78 @@ window.ORION_THEME = window.ORION_THEME || {};
 
     for (let f = 0; f < 6; f++) {
       const g = faces[f].g;
+
       if (f < 4) {
-        /* Sides: darker overhead, brighter at the horizon, like a sky. */
+        /* Sides: darkest at the top, opening out toward the horizon, then
+         * darkening again below it. */
         const grad = g.createLinearGradient(0, 0, 0, n);
         grad.addColorStop(0, sky1);
-        grad.addColorStop(0.58, sky0);
+        grad.addColorStop(0.46, sky0);
+        grad.addColorStop(0.62, sky0);
         grad.addColorStop(1, sky1);
         g.fillStyle = grad;
-      } else if (f === 4) {
-        const grad = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n * 0.72);
+        g.fillRect(0, 0, n, n);
+
+        /* A vignette at the left and right edges so the four side faces meet
+         * without a visible seam when it turns. */
+        const edge = g.createLinearGradient(0, 0, n, 0);
+        edge.addColorStop(0, 'rgba(0,0,0,0.16)');
+        edge.addColorStop(0.5, 'rgba(0,0,0,0)');
+        edge.addColorStop(1, 'rgba(0,0,0,0.16)');
+        g.fillStyle = edge;
+        g.fillRect(0, 0, n, n);
+      } else {
+        /* Up and down: flat, with the zenith and nadir a shade deeper so the
+         * sky does not read as a box. */
+        const grad = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n * 0.75);
         grad.addColorStop(0, sky1);
-        grad.addColorStop(1, sky0);
+        grad.addColorStop(1, f === 4 ? sky0 : sky1);
         g.fillStyle = grad;
-      } else {
-        g.fillStyle = sky1;
+        g.fillRect(0, 0, n, n);
       }
-      g.fillRect(0, 0, n, n);
-    }
-
-    /* Nebula on the four side faces, seeded so a theme always gets the same sky. */
-    const r = rng(seed || 99);
-    for (let f = 0; f < 4; f++) {
-      const g = faces[f].g;
-      for (let i = 0; i < 9; i++) {
-        const x = r() * n, y = n * 0.2 + r() * n * 0.6;
-        const rad = n * (0.16 + r() * 0.3);
-        const grad = g.createRadialGradient(x, y, 0, x, y, rad);
-        grad.addColorStop(0, r() < 0.5 ? (pal.cloud || pal.accent) : (pal.cloud2 || pal.accent2));
-        grad.addColorStop(1, 'rgba(0,0,0,0)');
-        g.globalAlpha = 0.1 + r() * 0.13;
-        g.fillStyle = grad;
-        g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
-      }
-      g.globalAlpha = 1;
-    }
-
-    /* Only the bright, bloomed stars are kept. The small ones were single
-     * pixels, and single pixels do not survive the blur — they were work that
-     * arrived as nothing. */
-    const sr = rng((seed || 99) ^ 0x5f5f);
-    for (let i = 0; i < 46; i++) {
-      /* Uniform on the sphere, so no clumping at the poles. */
-      const z = sr() * 2 - 1;
-      const t = sr() * Math.PI * 2;
-      const rad = Math.sqrt(1 - z * z);
-      const v = [Math.cos(t) * rad, z, Math.sin(t) * rad];
-
-      const ax = Math.abs(v[0]), ay = Math.abs(v[1]), az = Math.abs(v[2]);
-      let face, u, w;
-      if (az >= ax && az >= ay) {
-        face = v[2] > 0 ? 2 : 0;
-        u = (v[2] > 0 ? -v[0] : v[0]) / az; w = -v[1] / az;
-      } else if (ax >= ay) {
-        face = v[0] > 0 ? 1 : 3;
-        u = (v[0] > 0 ? v[2] : -v[2]) / ax; w = -v[1] / ax;
-      } else {
-        face = v[1] > 0 ? 4 : 5;
-        u = v[0] / ay; w = (v[1] > 0 ? v[2] : -v[2]) / ay;
-      }
-
-      const px = Math.round(((u + 1) / 2) * (n - 1));
-      const py = Math.round(((w + 1) / 2) * (n - 1));
-      const bright = sr();
-      const g = faces[face].g;
-      /* A few bright ones for sparkle, the rest darker than the sky so they
-       * survive the blend. */
-      const w2 = Math.max(1, Math.round(n / 110));
-      /* A core with a halo, which is what a star looks like once the client
-       * has blurred it. */
-      const size = w2 * (1.4 + bright * 2.4);
-      const grad = g.createRadialGradient(px, py, 0, px, py, size);
-      grad.addColorStop(0, pal.star);
-      grad.addColorStop(0.25, pal.star);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      g.globalAlpha = 0.18 + bright * 0.34;
-      g.fillStyle = grad;
-      g.fillRect(px - size, py - size, size * 2, size * 2);
-      g.globalAlpha = 1;
     }
 
     return faces.map((f) => f.c);
   };
 
   /* ---------------------------------------------------------------- widgets
-   * Flat, not Minecrafty. Vanilla's buttons are a bevel: a light top edge, a
-   * dark bottom one and a gradient between, which is what makes the menu look
-   * like 2011. These are the launcher's buttons instead — one thin border, one
-   * flat fill, and a left-hand accent bar on the hovered state to show focus
-   * the way the launcher's own nav does.
+   * The three button strips, painted over the client's own sheet.
    *
-   * The regions are still fixed by the game and still have to be filled:
-   *   (0,0,182,22)   hotbar
-   *   (0,22,24,24)   selected-slot highlight
+   * widgets.png is not just buttons. It also holds the hotbar at
+   * (0,0,182,22), the selected-slot outline at (0,22,24,24) and, in
+   * EaglercraftX, the globe and padlock icons the multiplayer list draws. A
+   * pack replaces whole files, so a widgets.png containing only buttons
+   * deletes all of that — which is precisely what the first version of this
+   * theme did, and why the hotbar changed when nobody asked it to.
+   *
+   * So `base` is the client's own sheet, captured by js/widgets.js from the
+   * running game. It is drawn first, and only these three rows are painted
+   * over:
+   *
    *   (0,46,200,20)  button, disabled
    *   (0,66,200,20)  button, normal
    *   (0,86,200,20)  button, hovered
-   * A button is stretched from the middle of its strip, so the left and right
-   * ends are what show and the centre is smeared — which is why the accent is
-   * a bar at the very edge rather than anything with detail in it.
+   *
+   * Everything else in the file is left exactly as the client shipped it.
+   * Without a base there is nothing safe to build, so this returns null and
+   * the pack simply has no widgets.png in it.
+   *
+   * A button is stretched from the middle of its strip — left half, then right
+   * half — so detail in the centre is smeared and only the ends survive. That
+   * is why the accent is a bar at the very edge.
    */
-  NS.widgets = function (pal) {
-    const { c, g } = cv(256, 256);
-    g.clearRect(0, 0, 256, 256);
+  NS.BUTTON_ROWS = { disabled: 46, normal: 66, hover: 86 };
 
-    const hex = (h) => h;
-    /* Slightly transparent fills, so the sky behind the main menu shows
-     * through the way a modern overlay would. */
+  NS.widgets = function (pal, base) {
+    if (!base) return null;
+
+    const { c, g } = cv(256, 256);
+    g.imageSmoothingEnabled = false;
+    g.clearRect(0, 0, 256, 256);
+    g.drawImage(base, 0, 0);
+
+    /* Wipe only the button rows before repainting them, or the vanilla grey
+     * shows through wherever ours is translucent. */
     const fill = (x, y, w, h, colour, alpha) => {
       g.globalAlpha = alpha === undefined ? 1 : alpha;
       g.fillStyle = colour;
@@ -474,63 +442,35 @@ window.ORION_THEME = window.ORION_THEME || {};
       g.globalAlpha = 1;
     };
 
-    /* --- hotbar: one flat bar, nine hairline cells --- */
-    fill(0, 0, 182, 22, pal.void, 0.82);
-    fill(0, 0, 182, 1, pal.line, 0.55);
-    fill(0, 21, 182, 1, pal.line, 0.3);
-    for (let i = 1; i < 9; i++) fill(1 + i * 20, 3, 1, 16, pal.line, 0.4);
-
-    /* --- selected slot: a thin accent frame, nothing inside it --- */
-    fill(0, 22, 24, 1, pal.accent);
-    fill(0, 45, 24, 1, pal.accent);
-    fill(0, 22, 1, 24, pal.accent);
-    fill(23, 22, 1, 24, pal.accent);
-    fill(1, 23, 22, 1, pal.accent, 0.3);
-    fill(1, 44, 22, 1, pal.accent, 0.3);
-
-    /* --- the three button states --- */
     const button = (y, opts) => {
-      /* flat fill */
+      g.clearRect(0, y, 200, 20);
       fill(0, y, 200, 20, opts.fill, opts.alpha);
-      /* one-pixel border, all four sides the same weight — no bevel */
+      /* One-pixel border, the same weight on all four sides — a bevel is what
+       * makes vanilla's buttons look like 2011. */
       fill(0, y, 200, 1, opts.border, opts.borderAlpha);
       fill(0, y + 19, 200, 1, opts.border, opts.borderAlpha);
       fill(0, y, 1, 20, opts.border, opts.borderAlpha);
       fill(199, y, 1, 20, opts.border, opts.borderAlpha);
-      /* the accent bar, at the left edge so stretching cannot smear it */
       if (opts.accent) fill(1, y + 1, 2, 18, opts.accent);
+      /* A single lighter row under the top border: enough to read as a
+       * surface rather than a flat rectangle, not enough to be a gradient. */
+      if (opts.sheen) fill(1, y + 1, 198, 1, opts.sheen, 0.5);
     };
 
-    /* disabled: barely there */
-    button(46, { fill: pal.void, alpha: 0.5, border: pal.line, borderAlpha: 0.28 });
-    /* normal: the launcher's panel colour */
-    button(66, { fill: pal.panel, alpha: 0.86, border: pal.line, borderAlpha: 0.6 });
-    /* hovered: brighter, with the accent bar lit */
-    button(86, { fill: pal.panel, alpha: 0.97, border: pal.accent, borderAlpha: 0.85, accent: pal.accent });
+    button(NS.BUTTON_ROWS.disabled, {
+      fill: pal.void, alpha: 0.62, border: pal.line, borderAlpha: 0.3
+    });
+    button(NS.BUTTON_ROWS.normal, {
+      fill: pal.panel, alpha: 0.92, border: pal.line, borderAlpha: 0.7, sheen: pal.line
+    });
+    button(NS.BUTTON_ROWS.hover, {
+      fill: pal.panel, alpha: 1, border: pal.accent, borderAlpha: 0.95,
+      accent: pal.accent, sheen: pal.accent
+    });
 
     return c;
   };
 
-  /* ------------------------------------------------------------------- font
-   * The single most Minecrafty thing left on a themed menu is the lettering,
-   * and the lettering is a texture like everything else:
-   * textures/font/ascii.png, a 16x16 grid of cells where the cell index is the
-   * character code. So cell 65 is 'A', and drawing into it by char code needs
-   * no table.
-   *
-   * Vanilla's sheet is 128x128 — 8x8 per cell — and the game works out each
-   * glyph's advance width by scanning its cell for the rightmost pixel that is
-   * not transparent, which means a font drawn here is measured automatically
-   * and needs no widths file.
-   *
-   * This one is 512x512, so 32x32 per cell. The game draws it at the same size
-   * on screen either way, so the extra resolution is spent on detail: at 8x8
-   * every letter has to be pixel art, and at 32x32 a real typeface fits, edges
-   * and all. That is what stops the menus reading as Minecraft.
-   *
-   * Drawn with the browser's own UI font rather than a font file, because a
-   * font file would have to be fetched and this site fetches nothing.
-   */
   const FONT_CELL = 32;
   const FONT_SHEET = FONT_CELL * 16;
 

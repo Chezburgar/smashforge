@@ -74,19 +74,20 @@
         <span><strong>Replace the lettering.</strong> The pixel font is the most Minecraft-looking
         thing left once the buttons are flat, and it is a texture like any other — this swaps it
         for a real typeface at four times the resolution, and swaps the yellow Minecraft in-joke
-        over the logo for lines of our own. Affects text everywhere, in menus and in game.</span>
+        over the logo for lines of our own. <em>This is the one part that reaches the game as well
+        as the menus</em>: chat, item names and signs use the same font. Turn it off for menus
+        only.</span>
       </label>
+
+      <div id="widget-state"></div>
 
       <label class="checkline">
         <input type="checkbox" id="f-widgets" checked>
-        <span><strong>Restyle the buttons too.</strong> This redraws the whole widget sheet, which
-        also holds the hotbar and the selected-slot outline — so your hotbar changes with it.
-        Turn it off to keep vanilla buttons and touch only the menu.</span>
+        <span><strong>Restyle the buttons.</strong> Only the three button states are replaced.
+        The hotbar, the selected-slot outline and the multiplayer list's icons share that same
+        texture file and are copied from your own client untouched, so nothing in the game
+        changes.</span>
       </label>
-
-      <div class="btn-row">
-        <button class="btn" id="btn-sky">A different sky</button>
-      </div>
 
       <div class="swatches" id="swatches"></div>
     </div>
@@ -126,15 +127,23 @@
   <div class="card">
     <h3>What it replaces, and what it cannot</h3>
     <table class="tbl">
-      <tr><th>File</th><th>What you see change</th></tr>
-      <tr><td class="mono">gui/title/minecraft.png</td><td>The big logo on the main menu</td></tr>
-      <tr><td class="mono">gui/title/mojang.png</td><td>The screen while the game loads its resources</td></tr>
-      <tr><td class="mono">gui/title/background/panorama_0…5.png</td><td>The world turning behind the main menu</td></tr>
-      <tr><td class="mono">gui/options_background.png</td><td>The tiled backdrop on every other menu</td></tr>
-      <tr><td class="mono">gui/widgets.png</td><td>Buttons, the hotbar and the selected-slot outline</td></tr>
-      <tr><td class="mono">font/ascii.png</td><td>Every letter the game draws, menus and in game</td></tr>
-      <tr><td class="mono">texts/splashes.txt</td><td>The yellow line flopped over the logo</td></tr>
+      <tr><th>File</th><th>What you see change</th><th>Where</th></tr>
+      <tr><td class="mono">gui/title/minecraft.png</td><td>The logo on the main menu</td><td><span class="pill ok">menu only</span></td></tr>
+      <tr><td class="mono">gui/title/mojang.png</td><td>The screen while the game loads its resources</td><td><span class="pill ok">menu only</span></td></tr>
+      <tr><td class="mono">gui/title/background/panorama_0…5.png</td><td>The sky turning behind the main menu</td><td><span class="pill ok">menu only</span></td></tr>
+      <tr><td class="mono">gui/options_background.png</td><td>The tiled backdrop on every other menu</td><td><span class="pill ok">menu only</span></td></tr>
+      <tr><td class="mono">gui/widgets.png</td><td>The three button states — and nothing else in that file</td><td><span class="pill ok">menu only</span></td></tr>
+      <tr><td class="mono">texts/splashes.txt</td><td>The yellow line flopped over the logo</td><td><span class="pill ok">menu only</span></td></tr>
+      <tr><td class="mono">font/ascii.png</td><td>Every letter the game draws</td><td><span class="pill warn">everywhere</span></td></tr>
     </table>
+    <div class="note" style="margin-top:14px">
+      <strong>Only one of those reaches the game itself.</strong> The lettering is a single texture,
+      so replacing it changes chat, item names and signs along with the menus — there is no way to
+      have one without the other, and the checkbox above turns it off. Everything else here is menu
+      furniture and cannot show up in a world. The hotbar in particular stays exactly as your client
+      draws it: the buttons share its file, so Orion copies the rest of that file from the client
+      instead of redrawing it.
+    </div>
     <div class="note" style="margin-top:14px">
       A resource pack can change pictures, sounds and text files, and nothing else. Where things
       sit is compiled into the client, which is signed and cannot be edited without breaking that
@@ -155,6 +164,7 @@
 <script src="../js/versions.js"></script>
 <script src="../js/zip.js"></script>
 <script src="../js/packs.js"></script>
+<script src="../js/widgets.js"></script>
 <script src="../js/account.js"></script>
 <script src="js/textures.js"></script>
 <script src="js/app.js"></script>

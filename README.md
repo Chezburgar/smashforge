@@ -119,7 +119,10 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
   itself: the jukebox, reskinned and renamed as the Orion Disc Printer. Bring an
   audio file, or have one generated.
 - **A menu theme** — [`orion/theme/`](orion/theme/README.md) restyles the main
-  menu, the buttons and the loading screen to match the launcher.
+  menu, the buttons, the lettering and the loading screen to match the
+  launcher, and touches nothing in the game while doing it: the buttons share a
+  texture with the hotbar, so Orion borrows that file from the client and
+  paints over only the button strips.
 - **Proximity voice that works** — the client has had it all along and it almost
   never connects, because it ships no connection servers of its own. Orion's
   TURN servers fix that, and the *Together* tab checks your microphone and your
@@ -337,6 +340,8 @@ orion/js/config.js    API + TURN endpoints; blank either to disable it
 orion/js/zip.js       writes a .zip in the browser, for packs Orion builds
 orion/js/packs.js     installs a pack into the client's own storage
 orion/js/voice.js     proximity voice: microphone and ICE checks
+orion/js/widgets.js   borrows the client's own button sheet, so the theme
+                        can restyle buttons without replacing the hotbar
 orion/client/1.8/     EaglercraftX 1.8-u53 + its signature
 orion/client/1.12.2/  Eaglercraft 1.12.2-u3
 orion/mods/           mod store: browse, install, and (for the owner) upload

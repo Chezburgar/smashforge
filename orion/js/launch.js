@@ -172,6 +172,12 @@ window.ORION = window.ORION || {};
     if (launched) throw new Error('The client is already running — reload the page to start it again.');
     if (!document.getElementById(containerId)) throw new Error('Launch container #' + containerId + ' is missing.');
 
+    /* Watches for the client's own widgets.png as it decodes its textures, so
+     * the theme can restyle buttons without replacing the hotbar with them.
+     * Removes itself the moment it finds it, and does nothing at all if it has
+     * been found before. */
+    if (O.Widgets) O.Widgets.install(v.id);
+
     /* Consumed by the client during its own startup, so it has to be in place
      * before the first script runs. */
     const signature = await loadSignature(v);

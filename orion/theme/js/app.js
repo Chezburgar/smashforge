@@ -22,6 +22,7 @@
   let doWidgets = true;
   let doText = true;
   let built = null;               /* the drawn canvases, cached until inputs change */
+  let baseWidgets = null;         /* the client's own widgets.png, if Orion has it */
 
   function notice(where, kind, html) {
     const b = $(where);
@@ -39,7 +40,9 @@
       mojang: T.mojang(pal, word),
       background: T.background(pal, seed),
       panorama: T.panorama(pal, seed, 256),
-      widgets: doWidgets ? T.widgets(pal) : null,
+      /* Only ever composited over the client's own sheet — see NS.widgets for
+       * why replacing the whole file is not an option. */
+      widgets: (doWidgets && baseWidgets) ? T.widgets(pal, baseWidgets) : null,
       font: doText ? T.font(pal) : null
     };
     return built;
@@ -202,13 +205,15 @@
     previewAll();
   });
 
-  $('#f-word').addEventListener('input', function () {
-    word = this.value.toUpperCase().replace(/[^A-Z0-9 .]/g, '').slice(0, 12) || 'ORION';
+  /* Each build has its own sheet, so switching version has to re-check. */
+  $('#f-version').addEventListener('change', async function () {
+    if (O.Widgets) baseWidgets = await O.Widgets.load(this.value);
+    renderWidgetState();
     previewAll();
   });
 
-  $('#btn-sky').addEventListener('click', function () {
-    seed = (Math.random() * 0xffffffff) >>> 0;
+  $('#f-word').addEventListener('input', function () {
+    word = this.value.toUpperCase().replace(/[^A-Z0-9 .]/g, '').slice(0, 12) || 'ORION';
     previewAll();
   });
 
@@ -344,8 +349,33 @@
     $('#btn-publish').style.display = Acc.isOwner() ? '' : 'none';
   }
 
+  /* Say plainly whether the buttons can be restyled, since it depends on
+   * whether the client has run in this browser yet. */
+  function renderWidgetState() {
+    const box = $('#widget-state');
+    if (!box) return;
+    const cb = $('#f-widgets');
+    if (baseWidgets) {
+      box.innerHTML = '<div class="note ok">Orion has your client\u2019s own button sheet, so the ' +
+        'buttons can be restyled with <strong>nothing else in that file touched</strong> — the hotbar, ' +
+        'the selected-slot outline and the server-list icons are copied straight from it.</div>';
+      cb.disabled = false;
+    } else {
+      box.innerHTML = '<div class="note warn"><strong>Launch the client once first.</strong> Buttons and ' +
+        'the hotbar share one texture file, so to restyle the buttons without changing the hotbar Orion ' +
+        'needs a copy of that file — and it takes it from your own client rather than shipping one. It ' +
+        'is captured automatically the first time the game starts; come back here afterwards and the ' +
+        'option below switches on. Everything else in the theme works now.</div>';
+      cb.checked = false;
+      cb.disabled = true;
+      doWidgets = false;
+    }
+  }
+
   async function boot() {
     renderPalettes();
+    if (O.Widgets) baseWidgets = await O.Widgets.load($('#f-version').value);
+    renderWidgetState();
     previewAll();
     if (Acc.available()) await Acc.resume();
     renderWho();

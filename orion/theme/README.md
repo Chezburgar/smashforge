@@ -30,11 +30,35 @@ sheet — `(0,0,155,44)`, then `(0,45,155,44)` placed beside it — so the wordm
 is drawn once across a 310-wide strip and cut down the middle, which is the only
 way to get letters that straddle the join.
 
-**The widget sheet** holds more than buttons: the hotbar at `(0,0,182,22)` and
-the selected-slot outline at `(0,22,24,24)` share it with the three button
-states at `(0,46)`, `(0,66)` and `(0,86)`. Replacing it means drawing all of
-them, so restyling the buttons necessarily restyles the hotbar. The page says
-so and lets you turn it off.
+**The widget sheet** holds far more than buttons. The hotbar sits at
+`(0,0,182,22)`, the selected-slot outline at `(0,22,24,24)`, the three button
+states at `(0,46)`, `(0,66)` and `(0,86)` — and in EaglercraftX, the globe and
+padlock icons the multiplayer server list draws are in there too. A pack
+replaces whole files, so a `widgets.png` containing only buttons deletes all of
+that. The first version of this theme did exactly that: it restyled the buttons
+and took the hotbar with them.
+
+Restyling buttons *only* therefore needs a copy of the client's own sheet to
+paint over, and `orion/js/widgets.js` takes one from the client installed here
+rather than committing artwork to this repository. The client turns every PNG
+into pixels by drawing it into a canvas and calling `getImageData`, so hooking
+that during launch hands over every texture it decodes. The hook cannot see
+file names, so `widgets.png` is recognised by its contents — the three button
+greys, and transparency just past where the hotbar ends:
+
+| Probe | Expected |
+|---|---|
+| `(100,76)` | `112,112,112,255` — button, normal |
+| `(100,96)` | `128,138,192,255` — button, hovered |
+| `(100,56)` | `45,45,45,255` — button, disabled |
+| `(190,10)` | fully transparent — right of the hotbar |
+
+Those four were enough to tell it from every other 256×256 texture the client
+loads, which was checked against all of them. It is captured once, kept in
+`localStorage` keyed by build, and the hook removes itself. Until it has been
+captured — a browser that has not launched the game yet — the theme leaves
+`widgets.png` out of the pack and the page says why, rather than shipping a
+sheet with holes in it.
 
 **The font** is the one that most decides whether a menu still looks like
 Minecraft, and it is a texture like the rest: `font/ascii.png` is a 16x16 grid
@@ -62,6 +86,18 @@ either one litters every screen — the first attempt broke both:
 
 Everything is drawn with the browser's own UI font rather than a font file,
 because a font file would have to be fetched and this site fetches nothing.
+
+## Menus only
+
+Everything in the table is menu furniture and cannot appear in a world, with
+one exception: the lettering. `font/ascii.png` is a single texture, so
+replacing it changes chat, item names and signs along with the menus — there is
+no way to have one without the other, and the page's checkbox turns it off for
+anyone who wants strictly menus.
+
+The hotbar in particular is left exactly as the client draws it. Verified by
+launching vanilla, screenshotting the hotbar in a world, installing the theme,
+and screenshotting the same spot again.
 
 ## What it cannot do
 
