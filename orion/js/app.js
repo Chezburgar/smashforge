@@ -894,6 +894,14 @@
       acts = duelButton('rematch', 'Play again', 'primary') + duelButton('leave', 'Close', 'ghost');
     }
 
+    /* If the other player has shared a join code on their Friends tab, it is
+     * the quickest way into their world when it does not show up by itself. */
+    if ((v.state === 'lobby' || v.state === 'live') && v.them && v.them.code) {
+      state += '<div class="note ok"><strong>' + esc(v.them.name) + '\u2019s world is open.</strong> ' +
+        'Join code <span class="mono">' + esc(v.them.code) + '</span>, if it does not appear in your ' +
+        'Multiplayer list on its own.</div>';
+    }
+
     $('#duel-state').innerHTML = state;
     $('#duel-actions').innerHTML = acts;
   }
@@ -1515,6 +1523,9 @@
     Acc.setActivity({ version: Vs.selected().id });
     renderFriends();
     pollFriends();
+    /* Signing in from the Duel tab should land you in your duel, not on the
+     * "sign in first" it was showing a second ago. */
+    if ($('#v-duel') && $('#v-duel').classList.contains('on')) refreshDuel();
   }
 
   /* ============================== friends ============================== */
