@@ -118,17 +118,10 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
   the game's music discs, so every jukebox plays yours, and ships the printer
   itself: the jukebox, reskinned and renamed as the Orion Disc Printer. Bring an
   audio file, or have one generated.
-- **An Orion menu, by default** — the client's title screen, skybox, loading
-  screen and buttons come up in Orion's colours without anyone asking for it:
-  `orion/js/autotheme.js` builds that resource pack and writes it into the
-  client's storage during the launch. Menus only — the buttons share a texture
-  with the hotbar, so Orion copies that file from the running client and paints
-  over only the three button strips, and the lettering is left alone so nothing
-  in the world or on the HUD changes. Two checkboxes beside **Launch client**:
-  one turns the whole thing off, the other swaps the pixel font for a real
-  typeface as well — off by default, because that one does reach chat, signs and
-  item names. [`orion/theme/`](orion/theme/README.md) is the same drawing code with
-  the palette, wordmark and subtitle exposed, for building a different one.
+- **Duels** — host a lobby, hand over a five-character code, and fight someone
+  best of three with the same kit. Orion runs the lobby and the scoreboard; the
+  fight itself is an ordinary shared world, which is what puts it through the
+  TURN servers. See the *Duel* tab.
 - **Proximity voice that works** — the client has had it all along and it almost
   never connects, because it ships no connection servers of its own. Orion's
   TURN servers fix that, and the *Together* tab checks your microphone and your
@@ -221,14 +214,14 @@ untouched server. Only for whoever is at that computer, but it works.
 ### Installing a pack, and switching it on
 
 Orion writes resource packs straight into the client's own storage and adds
-them to the game's selected packs, so printing discs or applying a theme is one
-button rather than a download, a file picker and four menus.
+them to the game's selected packs, so printing a set of discs is one button
+rather than a download, a file picker and four menus.
 
 Doing only the first half of that was a real bug for a while: a pack in the
 manifest shows up under *Available* in the game's Resource Packs screen and
-does **nothing at all** until somebody moves it to *Selected*. So discs, the
-printer block and the whole menu theme looked like they were being ignored —
-they were installed and switched off.
+does **nothing at all** until somebody moves it to *Selected*. So the discs and
+the printer block looked like they were being ignored — they were installed and
+switched off.
 
 Which packs are on is recorded somewhere else entirely from the packs
 themselves: the client keeps a vanilla-style `options.txt`, gzipped and
@@ -236,7 +229,7 @@ base64'd, in `localStorage["<localStorageNamespace>.g"]`, and the line that
 matters is
 
 ```
-resourcePacks:["orion-theme","my-records"]
+resourcePacks:["my-records"]
 ```
 
 exactly as Minecraft writes it. That was found by selecting a pack through the
@@ -266,11 +259,10 @@ loose files afterwards. Import also writes two files that are in no zip —
 filesystem cannot list a directory, so the client indexes those up front.
 `orion/js/packs.js` writes the same rows, including those two.
 
-Verified end to end on a browser profile that had never run the client:
-install the theme and a disc pack from their own pages, launch, and **without
-opening a single in-game menu** the menus are themed, the printed disc is in the
-creative inventory as "Orion – Inworld Test" with its own artwork, and the
-printer block is there as "Orion Disc Printer".
+Verified end to end on a browser profile that had never run the client: install
+a disc pack from its own page, launch, and **without opening a single in-game
+menu** the printed disc is in the creative inventory as "Orion – Inworld Test"
+with its own artwork, and the printer block is there as "Orion Disc Printer".
 
 The game reads that manifest while it starts, so a pack installed while the
 client is already running appears the next time it launches; Orion says so
@@ -316,6 +308,35 @@ to the first relay that answers — the game is handed one relay and keeps it, s
 handing it a dead one is the difference between "no worlds ever appear" and
 everything working. And the *Shared worlds* tab has **Test online play**, which
 tests the two steps in order and names the one that is broken.
+
+### Duels, and what Orion can honestly referee
+
+The *Duel* tab hosts a lobby, hands out a five-character code, gives both
+players the same kit and keeps a best-of-three score both sides watch live. The
+fight is an ordinary shared world, so it goes through the relay and the TURN
+servers like any other game between two browsers.
+
+What it cannot be is a game mode. Eaglercraft is the real client compiled to
+JavaScript and it is **signed**: nothing can be added inside it, no plugin sees
+a kill, and there is no server refereeing anything. So rounds are reported by
+the two people playing them — and the buttons are shaped around the one claim
+that is safe to trust:
+
+- **"I lost that round" counts immediately.** Nobody concedes a round they won.
+- **"I won that round" waits** for the other player to concede it.
+- **Both claiming the same round** is shown to both as a disagreement rather
+  than settled by whoever clicked first.
+
+The kit is a block of 1.8 commands rather than an inventory Orion can write —
+a resource pack cannot hand anybody an iron sword. The host pastes the arena
+block once and the kit block at the start of each round, which is why the world
+has to be opened with cheats allowed.
+
+Lobby, score and code live in `orion_client_duels` with the same shape as the
+rest of the backend: RLS on, no grants, and every call going through a
+`SECURITY DEFINER` function that starts by resolving the session token. Both
+sides poll `orion_client_duel_state` on the friends-list cadence, since each is
+watching rows only the other one writes.
 
 ### TURN for shared worlds — and for voice
 
@@ -385,15 +406,14 @@ orion/js/config.js    API + TURN endpoints; blank either to disable it
 orion/js/zip.js       writes a .zip in the browser, for packs Orion builds
 orion/js/packs.js     installs a pack into the client's own storage
 orion/js/voice.js     proximity voice: microphone and ICE checks
-orion/js/widgets.js   borrows the client's own button sheet, so the theme
-                        can restyle buttons without replacing the hotbar
+orion/js/duels.js     the duel lobby, the kit and the best-of-three score
 orion/client/1.8/     EaglercraftX 1.8-u53 + its signature
 orion/client/1.12.2/  Eaglercraft 1.12.2-u3
 orion/mods/           mod store: browse, install, and (for the owner) upload
 orion/mods/js/pack.js reads a .zip in the browser and rules on compatibility
 orion/skin/           skin designer: 64x64 sheet editor with a 3D preview
 orion/discs/          disc printer: music -> the game's music discs
-orion/theme/          menu theme: main menu, buttons and loading screens
+orion/relay/          the signalling relay proxy, and how to run your own
 tools/unpack-eaglercraft.js  pull a client out of an offline .html
 tools/make-orion-logo.js   rasterises the Orion mark to SVG
 ```

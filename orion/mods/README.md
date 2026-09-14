@@ -2,9 +2,9 @@
 
 Everything you can add to the game, in one place at `/orion/mods/`: the tools
 that ship with Orion on one shelf, uploaded resource packs on the other. It is
-the launcher's only link out — the disc printer, the theme builder, the skin
-designer and the voice setup used to be a row of five links in the navigation,
-which was the wrong place for them.
+the launcher's only link out — the disc printer, the skin designer and the
+voice setup used to be a row of links in the navigation, which was the wrong
+place for them.
 
 Anyone with an Orion account can browse and download.
 **Only an account with the `owner` role can upload** — the store is curated, not
@@ -12,13 +12,13 @@ a free-for-all.
 
 ## The built-in shelf
 
-`js/builtin.js` holds the four, and they are not all the same shape. Pretending
+`js/builtin.js` holds the three, and they are not all the same shape. Pretending
 they were would make "install" mean something different from one card to the
 next, so each card carries its kind:
 
 | Kind | Means | Which |
 |---|---|---|
-| `builder` | opens a page that generates a pack from your choices, then installs it | Disc Printer, Menu Theme |
+| `builder` | opens a page that generates a pack from your choices, then installs it | Disc Printer |
 | `setup` | nothing to install — a client feature to check and switch on | Proximity Voice |
 | `tool` | makes a file you use elsewhere | Skin Designer |
 

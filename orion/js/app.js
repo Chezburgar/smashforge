@@ -86,6 +86,7 @@
     if (view === 'setup') refreshSetup();
     if (view === 'together') { renderRelays(); renderTurn(); renderVoiceStatic(); }
     if (view === 'friends') pollFriends();
+    if (view === 'duel') refreshDuel();
     scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -146,53 +147,6 @@
     renderVersionPicker();
     await refreshBundle();
   });
-
-  /* ------------------------------- the menu theme -------------------------
-   * On by default and written into the client's storage at launch, so the
-   * checkbox only has to record the choice and say what is in there. */
-  function renderThemeState() {
-    const box = $('#theme-state');
-    const box2 = $('#f-menu-theme');
-    if (!box || !box2 || !O.AutoTheme) return;
-    const st = O.AutoTheme.state();
-    const fontBox = $('#f-menu-font');
-    box2.checked = st.enabled;
-    if (fontBox) {
-      fontBox.checked = st.withFont;
-      fontBox.disabled = !st.enabled;
-    }
-    if (!st.enabled) {
-      box.textContent = 'Off — the client will show its own menu.';
-      return;
-    }
-    if (!st.installed) {
-      box.textContent = 'Will be written into the client the next time you launch.';
-      return;
-    }
-    box.textContent = (st.withButtons
-      ? 'Installed, buttons included.'
-      : 'Installed. The buttons need your client’s own button sheet, which is copied on your next launch.') +
-      (st.withFont ? ' Lettering swapped.' : '');
-  }
-
-  if ($('#f-menu-font')) {
-    $('#f-menu-font').addEventListener('change', function () {
-      O.AutoTheme.setFont(this.checked);
-      renderThemeState();
-      $('#theme-state').textContent = this.checked
-        ? 'Lettering will be swapped the next time you launch.'
-        : 'Lettering will go back to the client’s own the next time you launch.';
-    });
-  }
-
-  if ($('#f-menu-theme')) {
-    $('#f-menu-theme').addEventListener('change', async function () {
-      const on = this.checked;
-      O.AutoTheme.setEnabled(on);
-      if (!on) await O.AutoTheme.remove(Vs.selected().id);
-      renderThemeState();
-    });
-  }
 
   async function refreshBundle() {
     const play = $('#bundle-state');
@@ -731,6 +685,336 @@
         : '<strong>No relay answered.</strong> Shared worlds cannot be created until at least one does — a network that blocks WebSockets, such as a school or work network, is the usual reason.'
     );
   });
+
+  /* =============================== duels ===============================
+   * The lobby and the scoreboard. Orion cannot see the fight — the client is
+   * signed and there is no server refereeing it — so the reporting buttons are
+   * built around the one thing that is safe to trust: nobody concedes a round
+   * they won. Conceding lands instantly, claiming waits to be agreed, and two
+   * people claiming the same round is shown rather than settled. */
+  const Du = O.Duels;
+  let duel = null;          /* the raw row, as the server last described it */
+  let duelStop = null;      /* the poller's stop handle */
+  let duelBusy = false;
+
+  function duelError(msg) {
+    const box = $('#duel-error');
+    if (!msg) {
+      box.classList.add('hide');
+      box.textContent = '';
+      return;
+    }
+    box.textContent = msg;
+    box.classList.remove('hide');
+  }
+
+  function stopDuelWatch() {
+    if (duelStop) duelStop();
+    duelStop = null;
+  }
+
+  function watchDuel() {
+    stopDuelWatch();
+    if (!duel) return;
+    duelStop = Du.watch(duel.id, function (row, err) {
+      /* Straight into the state rather than through setDuel: setDuel restarts
+       * the poller, and a poller that restarts itself on every tick is a
+       * tight loop, not a poller. */
+      if (row) {
+        if (duelGone(row)) return dropDuel(row);
+        duel = row;
+        renderDuel();
+      } else if (err) {
+        /* Swept, or never ours. Either way there is nothing left to show. */
+        duel = null;
+        stopDuelWatch();
+        renderDuel();
+        duelError(err);
+      }
+    });
+  }
+
+  /* A finished duel stays in the table so the other player can still read the
+   * result, so "close" is a local thing: this remembers the ones already put
+   * away rather than deleting something the other side is still looking at. */
+  const DUEL_CLOSED = 'orion.duel.closed.v1';
+  const duelClosed = (id) => {
+    try { return (localStorage.getItem(DUEL_CLOSED) || '').split(',').includes(id); }
+    catch (e) { return false; }
+  };
+  const closeDuel = (id) => {
+    try {
+      const kept = (localStorage.getItem(DUEL_CLOSED) || '').split(',').filter(Boolean).slice(-8);
+      kept.push(id);
+      localStorage.setItem(DUEL_CLOSED, kept.join(','));
+    } catch (e) { /* it comes back on the next visit, which is survivable */ }
+  };
+
+  /* Cancelled means the other player walked away; closed means this browser
+   * already put a finished one away. Either way there is nothing left to show,
+   * and the card would otherwise sit there with a dead score in it. */
+  const duelGone = (row) => !!row &&
+    (row.state === 'cancelled' || (row.state === 'done' && duelClosed(row.id)));
+
+  function dropDuel(row) {
+    duel = null;
+    stopDuelWatch();
+    renderDuel();
+    if (row && row.state === 'cancelled') duelError('That duel was called off.');
+  }
+
+  function setDuel(row) {
+    if (duelGone(row)) return dropDuel(row);
+    duel = row || null;
+    renderDuel();
+    if (duel) watchDuel();
+    else stopDuelWatch();
+  }
+
+  function duelSide(d, who, side) {
+    if (!who) {
+      return '<div class="duel-side ' + side + '">' +
+        '<div class="duel-name muted">Waiting…</div>' +
+        '<div class="duel-sub">nobody has joined yet</div></div>';
+    }
+    const where = who.online
+      ? (who.status === 'hosting' || who.status === 'playing' ? 'in the game' : 'in the launcher')
+      : 'not here right now';
+    return '<div class="duel-side ' + side + '">' +
+      '<div class="duel-name"><span class="duel-dot' + (who.online ? ' on' : '') + '"></span>' + esc(who.name) + '</div>' +
+      '<div class="duel-sub">' + (who.ready ? 'ready · ' : '') + where + '</div></div>';
+  }
+
+  function duelPips(d) {
+    const played = d.rounds || [];
+    const total = d.bestOf;
+    let html = '<div class="duel-pips">';
+    for (let i = 0; i < total; i++) {
+      const r = played[i];
+      let cls = '';
+      if (r) cls = (r.winner === d.youAre) ? ' me' : ' them';
+      html += '<span class="duel-pip' + cls + '"></span>';
+    }
+    return html + '</div>';
+  }
+
+  function renderDuelScore(v) {
+    const d = duel;
+    $('#duel-score').innerHTML =
+      '<div class="duel-score">' +
+      duelSide(d, v.me, 'me') +
+      '<div style="text-align:center">' +
+      '<div class="duel-wins">' +
+      '<span class="' + (v.myWins > v.theirWins ? 'lead' : '') + '">' + v.myWins + '</span>' +
+      '<span class="dash">–</span>' +
+      '<span class="' + (v.theirWins > v.myWins ? 'lead' : '') + '">' + v.theirWins + '</span>' +
+      '</div>' + duelPips(d) +
+      '<div class="duel-sub" style="margin-top:8px">first to ' + v.needed + '</div>' +
+      '</div>' +
+      duelSide(d, v.them, 'them') +
+      '</div>';
+  }
+
+  function duelButton(id, label, cls) {
+    return '<button class="btn ' + (cls || '') + '" data-duel="' + id + '">' + label + '</button>';
+  }
+
+  function renderDuel() {
+    if (!$('#duel-live')) return;
+    const live = $('#duel-live');
+    const join = $('#duel-join-row');
+    const hostRow = $('#duel-lobby-actions');
+
+    if (!duel) {
+      live.classList.add('hide');
+      join.classList.remove('hide');
+      hostRow.classList.remove('hide');
+      $('#duel-actions').innerHTML = '';
+      return;
+    }
+
+    const v = Du.read(duel);
+    live.classList.remove('hide');
+    join.classList.add('hide');
+    hostRow.classList.add('hide');
+
+    $('#duel-title').textContent = v.them ? v.me.name + ' vs ' + v.them.name : 'Your duel';
+    const pill = $('#duel-pill');
+    const label = { open: 'waiting', lobby: 'lobby', live: 'round ' + v.round, done: 'finished' }[v.state] || v.state;
+    pill.className = 'pill' + (v.state === 'live' ? ' ok' : v.state === 'done' ? ' warn' : '');
+    pill.textContent = label;
+
+    renderDuelScore(v);
+    renderDuelKit(v);
+
+    let state = '';
+    let acts = '';
+
+    if (v.state === 'open') {
+      state = '<div class="note"><strong>Give them this code.</strong> They put it in on their ' +
+        'own Duel tab and the lobby fills in.</div>' +
+        '<div style="margin:14px 0"><span class="duel-code" data-duel="copy-code" title="Click to copy">' +
+        esc(v.code) + '</span></div>';
+      acts = duelButton('copy-code', 'Copy the code', 'primary') + duelButton('leave', 'Cancel', 'ghost danger');
+
+    } else if (v.state === 'lobby') {
+      state = v.me.ready
+        ? '<div class="note ok"><strong>You are ready.</strong> ' +
+          (v.them.ready ? 'Starting…' : 'Waiting for ' + esc(v.them.name) + '.') + '</div>'
+        : '<div class="note"><strong>Both of you press ready</strong> once the world is open and you are ' +
+          'both standing in it. Round one starts from there.</div>';
+      acts = duelButton('ready', v.me.ready ? 'Not ready yet' : 'I am ready', v.me.ready ? '' : 'primary') +
+        duelButton('leave', 'Leave', 'ghost danger');
+
+    } else if (v.state === 'live') {
+      if (v.conflict) {
+        state = '<div class="note bad"><strong>You have both said you won round ' + v.round + '.</strong> ' +
+          'Orion is not going to guess. Sort it out between you — whoever actually lost it presses ' +
+          '<em>I lost that round</em>, and the score moves.</div>';
+      } else if (v.awaitingMe) {
+        state = '<div class="note warn"><strong>' + esc(v.them.name) + ' says they won round ' + v.round +
+          '.</strong> If that is right, agree and the score moves. If it is not, say you won it and ' +
+          'Orion will show you both that you disagree.</div>';
+      } else if (v.claimIsMine) {
+        state = '<div class="note"><strong>Waiting for ' + esc(v.them.name) + ' to agree</strong> that you ' +
+          'won round ' + v.round + '.</div>';
+      } else {
+        state = '<div class="note"><strong>Round ' + v.round + ' of at most ' + v.bestOf + '.</strong> ' +
+          'Paste the kit block below, fight, and report it when somebody dies.</div>';
+      }
+      acts = duelButton('won', 'I won that round', v.awaitingMe ? '' : 'primary') +
+        duelButton('lost', v.awaitingMe ? 'They did — agree' : 'I lost that round', v.awaitingMe ? 'primary' : '') +
+        duelButton('leave', 'Give up', 'ghost danger');
+
+    } else if (v.state === 'done') {
+      state = '<div class="note ' + (v.iWon ? 'ok' : 'warn') + '"><strong>' +
+        (v.iWon ? 'You won the series ' : esc(v.winnerName) + ' won the series ') +
+        Math.max(v.myWins, v.theirWins) + '–' + Math.min(v.myWins, v.theirWins) +
+        '.</strong> ' + (v.iWon ? 'Well played.' : 'Rematch?') + '</div>';
+      acts = duelButton('rematch', 'Play again', 'primary') + duelButton('leave', 'Close', 'ghost');
+    }
+
+    $('#duel-state').innerHTML = state;
+    $('#duel-actions').innerHTML = acts;
+  }
+
+  function renderDuelKit(v) {
+    $('#duel-kit-pill').textContent = v.kit.label.toLowerCase();
+    $('#duel-kit-blurb').textContent = v.kit.blurb;
+    $('#duel-kit-items').innerHTML = v.kit.items.map((i) => '<li>' + esc(i) + '</li>').join('');
+    $('#duel-cmd-arena').textContent = v.kit.arena.join('\n');
+    $('#duel-cmd-round').textContent = v.kit.round.join('\n');
+  }
+
+  async function duelAct(what, btn) {
+    if (duelBusy || !duel) return;
+    const v = Du.read(duel);
+    duelBusy = true;
+    if (btn) btn.disabled = true;
+    duelError(null);
+
+    let res = null;
+    if (what === 'ready') res = await Du.ready(duel.id, !v.me.ready);
+    else if (what === 'won') res = await Du.report(duel.id, v.round, 'me');
+    else if (what === 'lost') res = await Du.report(duel.id, v.round, 'them');
+    else if (what === 'rematch') res = await Du.rematch(duel.id);
+    else if (what === 'leave') {
+      stopDuelWatch();
+      /* Closing a finished duel is not the same as walking out of a live one:
+       * the other player may still be reading the result. */
+      if (v.finished) closeDuel(duel.id);
+      else await Du.leave(duel.id);
+      duelBusy = false;
+      duel = null;
+      duelError(null);
+      renderDuel();
+      return;
+    } else if (what === 'copy-code') {
+      try {
+        await navigator.clipboard.writeText(v.code);
+        notice('duel-state', 'ok', 'Code <strong>' + esc(v.code) + '</strong> copied. Send it over.');
+      } catch (e) {
+        notice('duel-state', 'warn', 'Copy it by hand: <strong>' + esc(v.code) + '</strong>');
+      }
+      duelBusy = false;
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    duelBusy = false;
+    if (btn) btn.disabled = false;
+    if (!res) return;
+    if (!res.ok) {
+      duelError(res.error);
+      return;
+    }
+    setDuel(res.duel);
+  }
+
+  $('#duel-actions').addEventListener('click', function (ev) {
+    const btn = ev.target.closest('button[data-duel]');
+    if (btn) duelAct(btn.dataset.duel, btn);
+  });
+  $('#duel-state').addEventListener('click', function (ev) {
+    const hit = ev.target.closest('[data-duel]');
+    if (hit) duelAct(hit.dataset.duel, null);
+  });
+
+  $('#btn-duel-host').addEventListener('click', async function () {
+    duelError(null);
+    this.disabled = true;
+    const res = await Du.create(parseInt($('#f-duel-best').value, 10) || 3, 'basic');
+    this.disabled = false;
+    if (!res.ok) return duelError(res.error);
+    setDuel(res.duel);
+  });
+
+  $('#btn-duel-join').addEventListener('click', async function () {
+    duelError(null);
+    const code = $('#f-duel-code').value.trim();
+    if (!code) return duelError('Enter the code your opponent gave you.');
+    this.disabled = true;
+    const res = await Du.join(code);
+    this.disabled = false;
+    if (!res.ok) return duelError(res.error);
+    $('#f-duel-code').value = '';
+    setDuel(res.duel);
+  });
+
+  $('#f-duel-code').addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter') $('#btn-duel-join').click();
+  });
+
+  /* Both blocks of commands, on one click each. */
+  document.addEventListener('click', async function (ev) {
+    const btn = ev.target.closest('button[data-copy-cmds]');
+    if (!btn || !duel) return;
+    const kit = Du.read(duel).kit;
+    const text = (btn.dataset.copyCmds === 'arena' ? kit.arena : kit.round).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      const was = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = was; }, 1400);
+    } catch (e) {
+      notice('duel-state', 'warn', 'Your browser would not let Orion copy that. Select it and copy by hand.');
+    }
+  });
+
+  /* A reload, or coming back to the tab, should find the duel you are in. */
+  async function refreshDuel() {
+    if (!Acc.signedIn()) {
+      duelError('Sign in first — a duel needs two named players.');
+      return;
+    }
+    const res = await Du.mine();
+    if (!res.ok) {
+      duelError(res.error);
+      return;
+    }
+    duelError(null);
+    setDuel(res.duel);
+  }
 
   /* ============================== TURN ============================== */
   const Tn = O.Turn;
@@ -1431,7 +1715,9 @@
    * injected as a <script>, and between "asked the browser for it" and "the
    * browser has it" there is nothing to count. The bar advances a real step per
    * finished stage and shimmers in between, which is the honest shape of it. */
-  const BOOT_STAGES = ['prep', 'theme', 'relay', 'turn', 'load', 'start'];
+  const BOOT_STAGES = ['prep', 'relay', 'turn', 'load', 'start'];
+  /* Set once the old menu theme has been swept out of the client. */
+  const THEME_SWEPT = 'orion.theme.removed.v1';
   let bootAt = 0;
   let bootTimer = null;
   let bootStars = null;
@@ -1532,21 +1818,6 @@
            entry ? entry.addr : 'EaglercraftX ' + bootVer.label);
     $('#shell').style.display = 'none';
 
-    /* The menu the client shows is a resource pack, and it has to be written
-     * into the client's storage before the client reads it. Cosmetic, so a
-     * failure here is logged and stepped over rather than stopping a launch. */
-    bootStage('theme');
-    try {
-      const th = await O.AutoTheme.ensure(bootVer.id);
-      if (th.ok && !th.skipped) {
-        console.info('[Orion] menu theme ' + (th.rebuilt ? 'rebuilt' : 'installed') +
-          ' (' + th.files + ' files' + (th.buttons ? ', buttons included' : ', buttons next launch') + ')');
-      } else if (!th.ok && !th.skipped) {
-        console.warn('[Orion] could not build the menu theme: ' + th.reason);
-      }
-      renderThemeState();
-    } catch (e) { /* the game matters more than the menu */ }
-
     /* The game is handed one primary relay and keeps it. If this network
      * cannot open that one, no shared world will ever appear — and no TURN
      * server fixes that, because the two browsers never get introduced in the
@@ -1628,6 +1899,7 @@
   $('#btn-launch').addEventListener('click', () => launch(null));
   $('#btn-launch-2').addEventListener('click', () => launch(null));
   $('#btn-goto-together').addEventListener('click', () => show('together'));
+  $('#btn-goto-duel').addEventListener('click', () => show('duel'));
   $('#btn-goto-servers').addEventListener('click', () => show('servers'));
   $('#game-exit').addEventListener('click', async () => {
     if (!confirm('Leave the game and go back to the launcher? Anything unsaved in a singleplayer world may be lost.')) return;
@@ -1676,7 +1948,23 @@
       return;
     }
 
-    renderThemeState();
+    /* Orion shipped a menu theme for a while and then stopped. Anyone who
+     * launched in between still has that pack installed and selected in their
+     * client, and nothing left in the launcher can turn it off — so it is
+     * taken out here, once. */
+    (async function dropOldThemes() {
+      try {
+        if (localStorage.getItem(THEME_SWEPT) === '1') return;
+        const gone = await O.Packs.dropThemes(Vs.selected().id);
+        localStorage.setItem(THEME_SWEPT, '1');
+        try { localStorage.removeItem('orion.autotheme.v1'); } catch (e) { /* already gone */ }
+        Object.keys(localStorage)
+          .filter((k) => k.indexOf('orion.widgets.') === 0)
+          .forEach((k) => { try { localStorage.removeItem(k); } catch (e) { /* ignore */ } });
+        if (gone.length) console.info('[Orion] removed the old menu theme (' + gone.join(', ') + ')');
+      } catch (e) { /* the launcher works fine either way */ }
+    })();
+
     gateOn(true);
     renderGate('Checking your session…', 'ok');
     const res = await Acc.resume();

@@ -36,14 +36,14 @@
  * Installing is only half the job, and for a while Orion only did that half:
  * a pack in the manifest shows up under *Available* in the game's Resource
  * Packs screen and does nothing at all until somebody moves it to *Selected*.
- * So discs, the printer block and the whole menu theme all appeared to be
- * ignored — they were installed and switched off.
+ * So the discs and the printer block appeared to be ignored — they were
+ * installed and switched off.
  *
  * Which packs are on is recorded somewhere else entirely: the client keeps a
  * vanilla-style options.txt, gzipped, base64'd, in
  * localStorage["<localStorageNamespace>.g"], and the line that matters is
  *
- *     resourcePacks:["orion-theme"]
+ *     resourcePacks:["my-records"]
  *
  * exactly as Minecraft writes it. That was found by selecting a pack through
  * the game's own screen and diffing localStorage, not by reading tea leaves.
@@ -392,6 +392,33 @@ window.ORION = window.ORION || {};
     } finally {
       db.close();
     }
+  };
+
+  /* Orion used to write a menu theme into the client, and a builder page could
+   * write more of them. Both are gone, and a pack nobody can manage any more
+   * has no business still repainting somebody's menus — so this takes them out
+   * on the way past, once, and says what it removed. Anything else installed,
+   * including packs from the store, is left exactly where it is. */
+  const THEME_FOLDER = /(^orion-menu$|-theme$)/;
+
+  P.dropThemes = async function (version) {
+    const v = version || '1.8';
+    if (!P.supported(v)) return [];
+    let installed;
+    try {
+      installed = await P.list(v);
+    } catch (e) {
+      return [];
+    }
+    const gone = [];
+    for (const entry of installed) {
+      const folder = entry && entry.folder;
+      if (!folder || !THEME_FOLDER.test(folder)) continue;
+      try {
+        if (await P.remove(folder, v)) gone.push(folder);
+      } catch (e) { /* a pack that will not go is not worth failing a load over */ }
+    }
+    return gone;
   };
 
   P.remove = async function (folder, version) {

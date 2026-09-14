@@ -1,9 +1,8 @@
 /* ORION CLIENT — writing a .zip in the browser
  *
- * Orion builds resource packs on the fly: the disc printer turns music into a
- * pack, the theme builder turns a palette into one. Both need to hand the
- * player a real .zip, and neither is allowed to depend on a CDN, so the format
- * is written out by hand.
+ * Orion builds resource packs on the fly — the disc printer turns music into
+ * one — and has to hand the player a real .zip without depending on a CDN, so
+ * the format is written out by hand.
  *
  * A zip is simpler to write than to read: each file gets a local header
  * followed by its bytes, then a central directory repeating those headers with

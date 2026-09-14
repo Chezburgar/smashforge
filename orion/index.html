@@ -30,7 +30,6 @@
          actually happening. -->
     <ol class="boot-stages" id="boot-stages">
       <li data-stage="prep">Checking your client</li>
-      <li data-stage="theme">Dressing the menu</li>
       <li data-stage="relay">Finding a relay that answers</li>
       <li data-stage="turn">Preparing connection servers</li>
       <li data-stage="load">Downloading the game</li>
@@ -95,13 +94,14 @@
     <div id="whoami"></div>
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button role="tab" data-view="play"    aria-selected="true">Play</button>
+      <button role="tab" data-view="duel"    aria-selected="false">Duel</button>
       <button role="tab" data-view="servers" aria-selected="false">Servers</button>
       <button role="tab" data-view="friends" aria-selected="false">Friends</button>
       <button role="tab" data-view="together" aria-selected="false">Together</button>
       <button role="tab" data-view="host"    aria-selected="false">Host</button>
       <button role="tab" data-view="setup"   aria-selected="false">Setup</button>
       <!-- One link out, not five: the store is where things you can add to the
-           game live, the disc printer and the theme builder included. -->
+           game live, the disc printer included. -->
       <a class="tab-link" href="mods/">Mods &amp; tools</a>
     </nav>
   </header>
@@ -130,24 +130,6 @@
           <button class="btn big ghost" id="btn-goto-servers">Manage servers</button>
         </div>
         <div id="bundle-state" style="margin-top:18px"></div>
-        <!-- The menu the client shows is a resource pack Orion writes before
-             it starts. On by default, off in one click, and nothing outside
-             the menus is touched either way. -->
-        <label class="checkline">
-          <input type="checkbox" id="f-menu-theme" checked>
-          <span><strong>Orion menu in game.</strong> The client's title screen, loading
-          screen and buttons, in Orion's colours instead of Minecraft's. Menus only —
-          the hotbar, the lettering and everything in the world are left exactly as the
-          client draws them. <a href="theme/">Build your own →</a></span>
-        </label>
-        <label class="checkline">
-          <input type="checkbox" id="f-menu-font">
-          <span><strong>Smooth lettering too.</strong> Swaps the pixel font for a real
-          typeface — the last thing that still looks like Minecraft once the buttons are
-          flat. <em>This one reaches the game as well as the menus</em>: chat, signs and
-          item names use the same letters.</span>
-        </label>
-        <div id="theme-state" class="muted" style="font-size:13px;margin-top:6px"></div>
       </div>
       <div class="hero-art">
         <img src="assets/orion-logo.svg" alt="">
@@ -164,6 +146,18 @@
       <div class="btn-row">
         <button class="btn primary" id="btn-launch-2">▶ Launch client</button>
         <button class="btn ghost" id="btn-goto-together">Read the walkthrough</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Or fight them</h3>
+      <p>
+        Host a duel, send the code, and go best of three with the same kit each. Orion
+        keeps the score; the fight is a shared world like any other, carried by the same
+        relay and TURN servers.
+      </p>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-goto-duel">⚔ Duel someone</button>
       </div>
     </div>
 
@@ -227,6 +221,134 @@
         <button class="btn primary" id="btn-import-run">Import</button>
         <button class="btn ghost" id="btn-import-close">Close</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ========================= DUEL =========================
+       Orion runs the lobby and the scoreboard. It cannot run the fight — the
+       client is signed, so nothing can be added inside it — which is why the
+       kit is a list of commands and the rounds are reported by the players. -->
+  <section class="view" id="v-duel" role="tabpanel">
+    <div class="card hero">
+      <div>
+        <h2>Duel someone</h2>
+        <p class="lede">
+          Host a lobby, give the other player the code, and fight
+          <strong>best of three</strong> with the same kit. The fight runs in a shared
+          world, so it goes through the same relay and TURN servers as any other game
+          between two browsers — no server to rent, nothing to install.
+        </p>
+        <div id="duel-error" class="note bad hide"></div>
+        <div id="duel-lobby-actions" class="btn-row" style="margin-top:18px">
+          <button class="btn primary big" id="btn-duel-host">Host a duel</button>
+        </div>
+        <div class="form-grid" style="margin-top:18px" id="duel-join-row">
+          <label class="field">
+            <span>Or join with a code</span>
+            <input type="text" id="f-duel-code" placeholder="ABCDE" autocomplete="off"
+                   spellcheck="false" maxlength="7" style="text-transform:uppercase">
+          </label>
+          <label class="field">
+            <span>Rounds</span>
+            <select id="f-duel-best">
+              <option value="3" selected>Best of 3</option>
+              <option value="1">One round</option>
+              <option value="5">Best of 5</option>
+            </select>
+          </label>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="btn-duel-join">Join that duel</button>
+        </div>
+      </div>
+      <div class="hero-art">
+        <img src="assets/orion-logo.svg" alt="">
+      </div>
+    </div>
+
+    <!-- Everything below is the running duel, and is hidden until there is one. -->
+    <div class="card hide" id="duel-live">
+      <h2>
+        <span id="duel-title">Duel</span>
+        <span class="pill" id="duel-pill">lobby</span>
+      </h2>
+      <div id="duel-score"></div>
+      <div id="duel-state"></div>
+      <div class="btn-row" id="duel-actions"></div>
+
+      <h3 style="margin-top:26px">How to start it</h3>
+      <ol class="steps" id="duel-steps">
+        <li>
+          <h4>Host: make a world with cheats on</h4>
+          <p>
+            <em>Singleplayer → Create New World</em>, then <strong>Allow Cheats: ON</strong>
+            before you create it. Cheats are what let you hand out the kit — without them
+            the commands below do nothing. A flat, quiet world is easiest to fight in.
+          </p>
+        </li>
+        <li>
+          <h4>Host: open it to other players</h4>
+          <p>
+            Press <kbd>Esc</kbd> and open the world to other players, leaving cheats
+            allowed. That registers it with your relay.
+          </p>
+        </li>
+        <li>
+          <h4>Other player: join from Multiplayer</h4>
+          <p>
+            The world appears under <em>“Scanning for games on your local network”</em>.
+            If it does not, press <strong>Test online play</strong> on the
+            <a href="#" data-goto="together">Together</a> tab — that says which half of the
+            connection this network is blocking.
+          </p>
+        </li>
+        <li>
+          <h4>Host: paste the arena commands, then the kit</h4>
+          <p>
+            Open chat with <kbd>T</kbd> and paste. The arena block is once per world; the
+            kit block goes in again at the start of every round.
+          </p>
+        </li>
+      </ol>
+
+      <h3 style="margin-top:26px">The kit <span class="pill" id="duel-kit-pill">basic</span></h3>
+      <p id="duel-kit-blurb" class="muted"></p>
+      <ul class="kit-list" id="duel-kit-items"></ul>
+      <div class="cmd-block">
+        <div class="cmd-head">
+          <strong>Arena — paste once</strong>
+          <button class="btn slim" data-copy-cmds="arena">Copy</button>
+        </div>
+        <pre class="mono" id="duel-cmd-arena"></pre>
+      </div>
+      <div class="cmd-block">
+        <div class="cmd-head">
+          <strong>Kit — paste at the start of every round</strong>
+          <button class="btn slim" data-copy-cmds="round">Copy</button>
+        </div>
+        <pre class="mono" id="duel-cmd-round"></pre>
+      </div>
+      <div class="note">
+        <strong>Only the host can run these.</strong> Cheats belong to whoever opened the
+        world, so the other player does not need to paste anything.
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>What Orion is doing here, and what it is not</h3>
+      <p>
+        The lobby, the code, the kit and the score are Orion's. <strong>The fight is
+        not.</strong> Eaglercraft is the real client compiled to JavaScript and it is
+        signed — nothing can be added inside it, no plugin sees a kill, and there is no
+        server to referee. So rounds are reported by the two of you.
+      </p>
+      <p>
+        That is why the buttons are shaped the way they are: <strong>“I lost that
+        round” counts straight away</strong>, because nobody claims a loss they did not
+        take. <strong>“I won that round” waits</strong> for the other player to agree.
+        If you both claim the same round, Orion says so and leaves it to you rather
+        than believing whoever clicked first.
+      </p>
     </div>
   </section>
 
@@ -922,14 +1044,10 @@ play.example.net {
 <script src="js/relays.js"></script>
 <script src="js/zip.js"></script>
 <script src="js/packs.js"></script>
-<script src="js/widgets.js"></script>
-<!-- The theme builder's own drawing code, borrowed as-is so the menu the game
-     gets by default and the one theme/ builds are the same textures. -->
-<script src="theme/js/textures.js"></script>
-<script src="js/autotheme.js"></script>
 <script src="js/account.js"></script>
 <script src="js/turn.js"></script>
 <script src="js/voice.js"></script>
+<script src="js/duels.js"></script>
 <script src="js/launch.js"></script>
 <script src="js/app.js"></script>
 </body>

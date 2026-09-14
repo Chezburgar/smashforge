@@ -1,6 +1,6 @@
 /* ORION MODS — the ones that ship with the launcher
  *
- * The store's other listings are resource packs somebody uploaded. These four
+ * The store's other listings are resource packs somebody uploaded. These three
  * are built into Orion, and they are here because this is where you go looking
  * for things to add to the game — a separate row of links in the launcher's
  * navigation was the wrong place for them.
@@ -9,9 +9,8 @@
  * the interface:
  *
  *   `builder`  opens a page that generates a pack you then install. The disc
- *              printer and the menu theme work this way, because what they make
- *              depends on choices only you can make — which track, which
- *              palette.
+ *              printer works this way, because what it makes depends on a
+ *              choice only you can make — which track.
  *   `setup`    nothing to install: a feature already in the client that needs
  *              checking and turning on. Proximity voice is this.
  *   `tool`     makes a file for you to use elsewhere. The skin designer.
@@ -50,20 +49,6 @@ window.ORION_MODS = window.ORION_MODS || {};
       href: '../#together',
       action: 'Set it up',
       art: 'voice'
-    },
-    {
-      id: 'menu-theme',
-      kind: 'builder',
-      title: 'Menu Theme',
-      summary: 'Already on. Open this to change the palette, the wordmark or the line under it.',
-      body: 'Orion writes a menu theme into the client as it launches, so the title screen, the sky, ' +
-            'the loading screen and the buttons are already in its colours. This is where you change ' +
-            'them: pick a palette, set your own wordmark, and install it in place of the default. ' +
-            'Menus only either way — nothing in the world or on the HUD is touched.',
-      versions: ['1.8', '1.12.2'],
-      href: '../theme/',
-      action: 'Open builder',
-      art: 'theme'
     },
     {
       id: 'skin-designer',
@@ -121,14 +106,6 @@ window.ORION_MODS = window.ORION_MODS || {};
       g.fill();
       g.fillRect(mid - n * 0.01, mid + n * 0.04, n * 0.02, n * 0.12);
       g.fillRect(mid - n * 0.1, mid + n * 0.16, n * 0.2, n * 0.025);
-    } else if (which === 'theme') {
-      g.fillStyle = '#1b1540';
-      g.fillRect(n * 0.14, n * 0.2, n * 0.72, n * 0.6);
-      g.fillStyle = '#9c86dc';
-      g.fillRect(n * 0.22, n * 0.3, n * 0.56, n * 0.07);
-      g.fillStyle = 'rgba(214,201,247,0.5)';
-      g.fillRect(n * 0.26, n * 0.46, n * 0.48, n * 0.08);
-      g.fillRect(n * 0.26, n * 0.6, n * 0.48, n * 0.08);
     } else {
       /* skin: a little body */
       g.fillStyle = '#d6c9f7';

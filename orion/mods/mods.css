@@ -6,8 +6,7 @@
 @media (max-width: 760px) { .hero-mods { grid-template-columns: 1fr; } .hero-mods .hero-art { display: none; } }
 
 .filters { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 18px; }
-/* .chip lives in css/orion.css — the store, the disc printer and the theme
-   builder all use it. */
+/* .chip lives in css/orion.css — the store and the disc printer share it. */
 
 .mod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); gap: 16px; margin-bottom: 18px; }
 
