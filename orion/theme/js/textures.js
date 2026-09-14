@@ -45,14 +45,15 @@ window.ORION_THEME = window.ORION_THEME || {};
   const PALETTES = {
     orion: {
       label: 'Orion',
-      blurb: 'The launcher’s violet, on near-black.',
-      void: '#07060f', bg: '#120e26', panel: '#1b1540',
-      line: '#4a3f86', accent: '#9c86dc', accent2: '#6f7fdd',
-      text: '#ece9ff', dim: '#a49cd0', star: '#e8e2ff',
-      /* The skybox is the one place the client overrides us — see the note on
-       * NS.panorama — so it gets its own saturated pair rather than reusing
-       * the near-black backdrop colours. */
-      sky0: '#4a1fb5', sky1: '#150a4a', cloud: '#8a4dff', cloud2: '#3f5bff'
+      blurb: 'Silver on a night sky. The default.',
+      void: '#04060c', bg: '#0a0f1a', panel: '#0f1726', line: '#33456b',
+      accent: '#9fc0f0', accent2: '#6f8ab0',
+      text: '#f2f6ff', dim: '#adbdd8', star: '#dce9ff',
+      /* The sky is drawn behind a fixed white-to-nothing gradient the client
+       * lays over it — see the note on NS.panorama — so near-black is the
+       * right floor: it is the bottom two thirds of the screen that can
+       * actually be dark. */
+      sky0: '#080d18', sky1: '#03050a', cloud: '#1b2b4d', cloud2: '#122038'
     },
     ember: {
       label: 'Ember',
@@ -184,60 +185,145 @@ window.ORION_THEME = window.ORION_THEME || {};
   NS.textWidth = textWidth;
 
   /* ------------------------------------------------------------------ title
-   * Drawn with a real typeface rather than the 3x5 pixel alphabet below. The
-   * sheet is 256x256 for a wordmark that is only 44 tall, so there is room for
-   * proper letterforms, and pixel-art capitals were most of what made the
-   * menu still look like Minecraft.
+   * The wordmark, and the one texture anybody actually looks at.
    *
-   * The layout constraint is the game's: 1.8 blits the title from two halves
-   * of one sheet, (0,0,155,44) then (0,45,155,44) beside it, so the wordmark is
-   * drawn once across a 310-wide strip and cut down the middle. That is the
-   * only way to get letters that straddle the join.
+   * Two things about it are the game's decision rather than ours:
+   *
+   *   1.8 blits the title from two halves of one sheet — (0,0,155,44) and then
+   *   (0,45,155,44) placed beside it — so the wordmark is drawn once across a
+   *   310-wide strip and cut down the middle. Nothing else produces letters
+   *   that straddle the join.
+   *
+   *   Those numbers are texture units of a 256-wide sheet, not pixels. A
+   *   bigger sheet is sampled in the same places and simply arrives sharper,
+   *   so this draws at 4x: at 256, a wordmark that spans the screen is eleven
+   *   pixels tall and looks it.
    */
-  NS.title = function (pal, word) {
-    const text = (word || 'ORION').toUpperCase().slice(0, 16);
-    const strip = cv(310, 44);
+  const TITLE_SCALE = 4;
+  NS.TITLE_SCALE = TITLE_SCALE;
+  const TITLE_FONT = (px, weight) =>
+    weight + ' ' + px + 'px "Segoe UI", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif';
+
+  NS.title = function (pal, word, subtitle) {
+    const S = TITLE_SCALE;
+    const text = (word || 'ORION CLIENT').toUpperCase().slice(0, 22);
+    const sub = subtitle === undefined ? 'eaglercraft javascript runtime' : String(subtitle || '');
+
+    const stripW = 310 * S;
+    const stripH = 44 * S;
+    const strip = cv(stripW, stripH);
     const g = strip.g;
     g.imageSmoothingEnabled = true;
 
-    /* Fit the word to the strip, then space it out: wide tracking is most of
-     * what reads as modern. Tracking is applied by drawing character by
-     * character, since canvas has no letter-spacing everywhere. */
-    let size = 30;
-    let track = Math.max(2, Math.round(size * 0.16));
-    const font = (px) => '700 ' + px + 'px "Rajdhani", "Segoe UI", system-ui, -apple-system, sans-serif';
+    /* The lettering is drawn on its own layer first, then that layer is drawn
+     * twice: once blurred for the glow, once sharp on top. Drawing a shadow
+     * per character instead stacks the shadows where letters overlap, and what
+     * should be a halo comes out as a row of solid blobs. */
+    const layer = cv(stripW, stripH);
+    const lg = layer.g;
+    lg.imageSmoothingEnabled = true;
+    lg.textBaseline = 'alphabetic';
+
+    /* Fit the word, then space it out. Wide tracking is most of what reads as
+     * modern, and it has to be applied by hand because canvas has no
+     * letter-spacing everywhere. */
+    let size = 30 * S;
+    let track = Math.round(size * 0.06);
     const widthOf = (px, sp) => {
-      g.font = font(px);
+      lg.font = TITLE_FONT(px, '300');
       let w = 0;
-      for (const ch of text) w += g.measureText(ch).width + sp;
+      for (const ch of text) w += lg.measureText(ch).width + sp;
       return w - sp;
     };
-    while (size > 8 && widthOf(size, track) > 286) {
-      size -= 1;
-      track = Math.max(2, Math.round(size * 0.16));
+    while (size > 8 * S && widthOf(size, track) > stripW - 24 * S) {
+      size -= S;
+      track = Math.round(size * 0.06);
     }
 
     const w = widthOf(size, track);
-    let x = Math.round((310 - w) / 2);
-    const baseline = 30;
+    const startX = Math.round((stripW - w) / 2);
+    const baseline = Math.round(stripH * 0.62);
 
-    g.font = font(size);
-    g.textBaseline = 'alphabetic';
+    /* Silver rather than flat white: a vertical ramp is what gives the letters
+     * any weight at all at this size. */
+    const silver = lg.createLinearGradient(0, baseline - size * 0.78, 0, baseline + size * 0.1);
+    silver.addColorStop(0, '#ffffff');
+    silver.addColorStop(0.55, pal.text);
+    silver.addColorStop(1, pal.dim);
+
+    lg.font = TITLE_FONT(size, '300');
+    lg.fillStyle = silver;
+    let x = startX;
     for (const ch of text) {
-      g.fillStyle = pal.text;
-      g.fillText(ch, x, baseline);
-      x += g.measureText(ch).width + track;
+      lg.fillText(ch, x, baseline);
+      x += lg.measureText(ch).width + track;
     }
 
-    /* A hairline under the word, in the accent — the launcher's own heading
-     * treatment, and the thing that makes it look designed rather than
-     * dropped in. */
-    g.fillStyle = pal.accent;
-    g.fillRect(Math.round((310 - w) / 2), baseline + 6, Math.round(w), 2);
+    if (sub) {
+      const subSize = Math.round(size * 0.34);
+      const subTrack = Math.round(subSize * 0.04);
+      lg.font = TITLE_FONT(subSize, '400');
+      let total = 0;
+      for (const ch of sub) total += lg.measureText(ch).width + subTrack;
+      total -= subTrack;
+      let sx = Math.round((stripW - total) / 2);
+      const subBase = Math.min(stripH - 3 * S, baseline + Math.round(size * 0.46));
+      lg.fillStyle = pal.dim;
+      for (const ch of sub) {
+        lg.fillText(ch, sx, subBase);
+        sx += lg.measureText(ch).width + subTrack;
+      }
+    }
 
-    const out = cv(256, 256);
-    out.g.drawImage(strip.c, 0, 0, 155, 44, 0, 0, 155, 44);
-    out.g.drawImage(strip.c, 155, 0, 155, 44, 0, 45, 155, 44);
+    /* Now the part that decides whether any of this is readable.
+     *
+     * The client lays a white gradient over the whole menu, strongest exactly
+     * where the title sits — measured at about 43% at the top of the screen —
+     * so the wordmark is drawn on light grey, not on the near-black sky. A
+     * white halo would make that worse, and a dark plate behind the strip
+     * comes out as a visible blob however softly it is faded, because the strip
+     * is 310x44 and there is nowhere for the fade to go.
+     *
+     * What works is a shadow shaped like the letters themselves: the lettering
+     * is turned into a black silhouette, blurred, and laid down before the
+     * sharp copy. It darkens only what is right behind the strokes, follows
+     * every curve, and has no edge of its own to see.
+     */
+    const shade = cv(stripW, stripH);
+    const sg = shade.g;
+    sg.drawImage(layer.c, 0, 0);
+    sg.globalCompositeOperation = 'source-in';
+    sg.fillStyle = '#000000';
+    sg.fillRect(0, 0, stripW, stripH);
+    sg.globalCompositeOperation = 'source-over';
+
+    const blur = (px) => (typeof g.filter === 'string' ? 'blur(' + Math.max(2, Math.round(px)) + 'px)' : 'none');
+
+    /* Twice, at two radii: the wide pass darkens the area, the tight one puts
+     * an edge back under the strokes. */
+    g.save();
+    g.globalAlpha = 0.3;
+    g.filter = blur(size * 0.2);
+    g.drawImage(shade.c, 0, 0);
+    g.globalAlpha = 0.6;
+    g.filter = blur(size * 0.06);
+    g.drawImage(shade.c, 0, 0);
+    g.restore();
+
+    /* A whisper of light around the strokes, for the lit look the launcher's
+     * own headings have. Kept low: on grey it is nearly invisible, and on the
+     * dark half of the menu it is the whole effect. */
+    g.save();
+    g.globalAlpha = 0.3;
+    g.filter = blur(size * 0.1);
+    g.drawImage(layer.c, 0, 0);
+    g.restore();
+
+    g.drawImage(layer.c, 0, 0);
+
+    const out = cv(256 * S, 256 * S);
+    out.g.drawImage(strip.c, 0, 0, 155 * S, 44 * S, 0, 0, 155 * S, 44 * S);
+    out.g.drawImage(strip.c, 155 * S, 0, 155 * S, 44 * S, 0, 45 * S, 155 * S, 44 * S);
     return out.c;
   };
 
@@ -289,7 +375,7 @@ window.ORION_THEME = window.ORION_THEME || {};
     const label = (word || 'ORION').toUpperCase().slice(0, 16);
     g.textBaseline = 'alphabetic';
     const spaced = (str, px, weight, colour, y) => {
-      g.font = weight + ' ' + px + 'px "Rajdhani", "Segoe UI", system-ui, -apple-system, sans-serif';
+      g.font = TITLE_FONT(px, weight);
       const track = Math.max(2, Math.round(px * 0.18));
       let total = 0;
       for (const ch of str) total += g.measureText(ch).width + track;
@@ -301,8 +387,8 @@ window.ORION_THEME = window.ORION_THEME || {};
         x += g.measureText(ch).width + track;
       }
     };
-    spaced(label, 26, '700', pal.text, 196);
-    spaced('LOADING', 12, '600', pal.dim, 222);
+    spaced(label, 24, '300', pal.text, 196);
+    spaced('LOADING', 11, '400', pal.dim, 222);
     return c;
   };
 
@@ -310,22 +396,36 @@ window.ORION_THEME = window.ORION_THEME || {};
    * A 16x16 tile, repeated across every screen that is not the main menu.
    * Vanilla's is dirt, which is why every Minecraft menu looks like the inside
    * of a hole. This is a near-flat wash with a very faint grid, so at menu
-   * scale it reads as one calm surface rather than a texture — the launcher's
-   * panel, essentially. The client darkens whatever is here, so it is drawn a
-   * step lighter than the colour wanted on screen.
+   * scale it reads as one calm surface rather than a texture.
+   *
+   * The client draws it dark. Measured rather than guessed: a tile of
+   * #0a0f1a — rgb(10,15,26) — renders as rgb(3,4,7), so it arrives at about
+   * 28% brightness. The tile is therefore painted roughly 3.5x lighter than
+   * the colour wanted on screen, which is what stops the backdrop coming out
+   * as flat black.
    */
+  const DARKENED_TO = 0.28;
+
+  function lift(hex, factor) {
+    const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex || '#000000');
+    if (!m) return hex;
+    const up = (h) => Math.min(255, Math.round(parseInt(h, 16) * factor));
+    return 'rgb(' + up(m[1]) + ',' + up(m[2]) + ',' + up(m[3]) + ')';
+  }
+
   NS.background = function (pal, seed) {
     const { c, g } = cv(16, 16);
-    g.fillStyle = pal.bg;
+    const factor = 1 / DARKENED_TO;
+    g.fillStyle = lift(pal.bg, factor);
     g.fillRect(0, 0, 16, 16);
     /* One hairline in each direction: enough to catch the light, not enough to
      * be a pattern. */
-    g.globalAlpha = 0.22;
-    g.fillStyle = pal.panel;
+    g.globalAlpha = 0.14;
+    g.fillStyle = lift(pal.panel, factor * 1.1);
     g.fillRect(0, 0, 16, 1);
     g.fillRect(0, 0, 1, 16);
-    g.globalAlpha = 0.16;
-    g.fillStyle = pal.void;
+    g.globalAlpha = 0.12;
+    g.fillStyle = lift(pal.void, factor * 0.6);
     g.fillRect(15, 0, 1, 16);
     g.fillRect(0, 15, 16, 1);
     g.globalAlpha = 1;
@@ -336,22 +436,24 @@ window.ORION_THEME = window.ORION_THEME || {};
    * The six faces of the skybox that turns behind the main menu: 0 north,
    * 1 east, 2 south, 3 west, 4 up, 5 down.
    *
-   * Two things about this face are the client's decision, not ours, and both
-   * were established by installing probe packs and looking rather than by
-   * guessing:
+   * What the client does to it was measured, not guessed: a pack of six pure
+   * black faces was installed and the rendered menu sampled. The result, on a
+   * 1280x800 window:
    *
-   *   It blends the skybox heavily toward white. Six flat #ff00aa faces arrive
-   *   on screen as pale pink; six transparent faces arrive as light grey. So a
-   *   dark sky is not achievable here at all — the floor is set by the blend.
-   *   Saturated mid-tones survive it best.
+   *     y = 80    rgb 109      y = 300   rgb 65
+   *     y = 700   rgb 9        y = 760   rgb 3
    *
-   *   It blurs it, hard. Detail is gone by the time it is on screen.
+   * So the client lays a white-to-nothing vertical gradient over the skybox:
+   * about 43% at the very top, gone by two thirds of the way down. (An earlier
+   * version of this note said a dark sky was impossible. That was drawn from
+   * one flat magenta test and was too broad — the wash is only at the top, and
+   * the bottom two thirds of the screen are as dark as the texture is.
+   * Blanking gui/title/background/panorama_overlay.png changes nothing, in
+   * either direction: this build does not draw it.)
    *
-   * The first version fought both of those with a starfield and drifts of
-   * nebula, and the result was exactly what you would expect: pale lilac
-   * cloud. So this is a plain vertical gradient with a soft vignette and
-   * nothing else. A clean gradient is the one thing that survives a blur
-   * intact, and it is what the launcher's own background is.
+   * So: near-black, with stars that survive the wash where it is weakest, and
+   * one soft drift of nebula. The buttons sit in the dark half, which is what
+   * matters most.
    */
   NS.panorama = function (pal, seed, size) {
     const n = size || 256;
@@ -363,35 +465,59 @@ window.ORION_THEME = window.ORION_THEME || {};
 
     for (let f = 0; f < 6; f++) {
       const g = faces[f].g;
+      const rnd = rng((seed || 1) * 977 + f * 131 + 7);
 
       if (f < 4) {
-        /* Sides: darkest at the top, opening out toward the horizon, then
-         * darkening again below it. */
+        /* Sides: a shade lighter toward the horizon, so the sky has a
+         * direction without ever leaving near-black. */
         const grad = g.createLinearGradient(0, 0, 0, n);
         grad.addColorStop(0, sky1);
-        grad.addColorStop(0.46, sky0);
-        grad.addColorStop(0.62, sky0);
+        grad.addColorStop(0.52, sky0);
         grad.addColorStop(1, sky1);
         g.fillStyle = grad;
         g.fillRect(0, 0, n, n);
-
-        /* A vignette at the left and right edges so the four side faces meet
-         * without a visible seam when it turns. */
-        const edge = g.createLinearGradient(0, 0, n, 0);
-        edge.addColorStop(0, 'rgba(0,0,0,0.16)');
-        edge.addColorStop(0.5, 'rgba(0,0,0,0)');
-        edge.addColorStop(1, 'rgba(0,0,0,0.16)');
-        g.fillStyle = edge;
-        g.fillRect(0, 0, n, n);
       } else {
-        /* Up and down: flat, with the zenith and nadir a shade deeper so the
-         * sky does not read as a box. */
         const grad = g.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n * 0.75);
-        grad.addColorStop(0, sky1);
-        grad.addColorStop(1, f === 4 ? sky0 : sky1);
+        grad.addColorStop(0, f === 4 ? sky0 : sky1);
+        grad.addColorStop(1, sky1);
         g.fillStyle = grad;
         g.fillRect(0, 0, n, n);
       }
+
+      /* One drift of nebula per face, wide and faint. Anything with an edge is
+       * lost to the blur, but a large soft blob survives as colour. */
+      const cxs = [0.3, 0.72, 0.5, 0.2, 0.5, 0.5];
+      const nb = g.createRadialGradient(
+        n * cxs[f], n * (f === 4 ? 0.5 : 0.34), 0,
+        n * cxs[f], n * (f === 4 ? 0.5 : 0.34), n * 0.62
+      );
+      nb.addColorStop(0, pal.cloud || sky0);
+      nb.addColorStop(0.5, pal.cloud2 || sky0);
+      nb.addColorStop(1, 'rgba(0,0,0,0)');
+      g.globalAlpha = f === 5 ? 0.12 : 0.34;
+      g.fillStyle = nb;
+      g.fillRect(0, 0, n, n);
+      g.globalAlpha = 1;
+
+      /* Stars. Down gets fewer: it is the bottom of the screen, which is the
+       * part the wash leaves alone, so a dense field there reads as noise. */
+      const count = f === 5 ? 40 : 150;
+      for (let i = 0; i < count; i++) {
+        const x = Math.floor(rnd() * n);
+        const y = Math.floor(rnd() * n);
+        const bright = 0.25 + rnd() * 0.75;
+        g.fillStyle = pal.star || '#ffffff';
+        g.globalAlpha = bright;
+        g.fillRect(x, y, 1, 1);
+        /* A handful are given a second pixel so a few stars read as brighter
+         * rather than every one being identical. */
+        if (bright > 0.9) {
+          g.globalAlpha = bright * 0.5;
+          g.fillRect(x + 1, y, 1, 1);
+          g.fillRect(x, y + 1, 1, 1);
+        }
+      }
+      g.globalAlpha = 1;
     }
 
     return faces.map((f) => f.c);
@@ -421,7 +547,8 @@ window.ORION_THEME = window.ORION_THEME || {};
    *
    * A button is stretched from the middle of its strip — left half, then right
    * half — so detail in the centre is smeared and only the ends survive. That
-   * is why the accent is a bar at the very edge.
+   * rules out anything with horizontal structure, and leaves a flat fill, a
+   * one-pixel border and a single row of sheen.
    */
   NS.BUTTON_ROWS = { disabled: 46, normal: 66, hover: 86 };
 
@@ -451,21 +578,22 @@ window.ORION_THEME = window.ORION_THEME || {};
       fill(0, y + 19, 200, 1, opts.border, opts.borderAlpha);
       fill(0, y, 1, 20, opts.border, opts.borderAlpha);
       fill(199, y, 1, 20, opts.border, opts.borderAlpha);
-      if (opts.accent) fill(1, y + 1, 2, 18, opts.accent);
       /* A single lighter row under the top border: enough to read as a
        * surface rather than a flat rectangle, not enough to be a gradient. */
-      if (opts.sheen) fill(1, y + 1, 198, 1, opts.sheen, 0.5);
+      if (opts.sheen) fill(1, y + 1, 198, 1, opts.sheen, 0.28);
     };
 
+    /* Translucent on purpose: the sky showing faintly through the fill is what
+     * makes these read as glass laid over the menu rather than as grey slabs
+     * stuck on it. */
     button(NS.BUTTON_ROWS.disabled, {
-      fill: pal.void, alpha: 0.62, border: pal.line, borderAlpha: 0.3
+      fill: pal.void, alpha: 0.5, border: pal.line, borderAlpha: 0.28
     });
     button(NS.BUTTON_ROWS.normal, {
-      fill: pal.panel, alpha: 0.92, border: pal.line, borderAlpha: 0.7, sheen: pal.line
+      fill: pal.panel, alpha: 0.72, border: pal.accent2, borderAlpha: 0.75, sheen: pal.accent2
     });
     button(NS.BUTTON_ROWS.hover, {
-      fill: pal.panel, alpha: 1, border: pal.accent, borderAlpha: 0.95,
-      accent: pal.accent, sheen: pal.accent
+      fill: pal.panel, alpha: 0.88, border: pal.accent, borderAlpha: 1, sheen: pal.accent
     });
 
     return c;

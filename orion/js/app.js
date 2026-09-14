@@ -147,6 +147,53 @@
     await refreshBundle();
   });
 
+  /* ------------------------------- the menu theme -------------------------
+   * On by default and written into the client's storage at launch, so the
+   * checkbox only has to record the choice and say what is in there. */
+  function renderThemeState() {
+    const box = $('#theme-state');
+    const box2 = $('#f-menu-theme');
+    if (!box || !box2 || !O.AutoTheme) return;
+    const st = O.AutoTheme.state();
+    const fontBox = $('#f-menu-font');
+    box2.checked = st.enabled;
+    if (fontBox) {
+      fontBox.checked = st.withFont;
+      fontBox.disabled = !st.enabled;
+    }
+    if (!st.enabled) {
+      box.textContent = 'Off — the client will show its own menu.';
+      return;
+    }
+    if (!st.installed) {
+      box.textContent = 'Will be written into the client the next time you launch.';
+      return;
+    }
+    box.textContent = (st.withButtons
+      ? 'Installed, buttons included.'
+      : 'Installed. The buttons need your client’s own button sheet, which is copied on your next launch.') +
+      (st.withFont ? ' Lettering swapped.' : '');
+  }
+
+  if ($('#f-menu-font')) {
+    $('#f-menu-font').addEventListener('change', function () {
+      O.AutoTheme.setFont(this.checked);
+      renderThemeState();
+      $('#theme-state').textContent = this.checked
+        ? 'Lettering will be swapped the next time you launch.'
+        : 'Lettering will go back to the client’s own the next time you launch.';
+    });
+  }
+
+  if ($('#f-menu-theme')) {
+    $('#f-menu-theme').addEventListener('change', async function () {
+      const on = this.checked;
+      O.AutoTheme.setEnabled(on);
+      if (!on) await O.AutoTheme.remove(Vs.selected().id);
+      renderThemeState();
+    });
+  }
+
   async function refreshBundle() {
     const play = $('#bundle-state');
     play.innerHTML = '<div class="note">Looking for the client…</div>';
@@ -585,7 +632,7 @@
           '<div>' +
           '<div class="srv-name">' + esc(e.comment || O.Servers.hostLabel(e.addr)) +
           (e.primary ? ' <span class="pill ok">primary</span>' : '') +
-          (e.builtin ? ' <span class="pill">built in</span>' : '') +
+          (e.orion ? ' <span class="pill ok">Orion</span>' : e.builtin ? ' <span class="pill">built in</span>' : '') +
           '</div>' +
           '<div class="srv-addr">' + esc(e.addr) + '</div>' +
           '<div class="srv-meta" data-meta>' + st.text + '</div>' +
@@ -655,7 +702,7 @@
   });
 
   $('#btn-relay-reset').addEventListener('click', function () {
-    if (!confirm('Restore the three built-in public relays and drop any you added?')) return;
+    if (!confirm('Restore the built-in relays and drop any you added?')) return;
     R.reset();
     renderRelays();
     notice('relay-notice', 'ok', 'Relay list restored to the built-in defaults.');
@@ -748,6 +795,125 @@
     this.disabled = false;
     this.textContent = 'Test TURN';
     renderTurn();
+  });
+
+  /* ====================== does online play work here? ======================
+   * The two halves of a shared world fail separately, and nearly every "online
+   * does not work" report is one specific half being blocked. This tests them
+   * in the order they actually happen and names the one that is broken, rather
+   * than leaving people to guess from a dead Multiplayer screen. */
+
+  function onlinePill(cls, text) {
+    const p = $('#online-pill');
+    p.className = 'pill' + (cls ? ' ' + cls : '');
+    p.textContent = text;
+  }
+
+  async function checkRelays(budgetMs) {
+    const out = [];
+    for (const e of R.all()) {
+      const res = await R.probe(e.id, budgetMs || 4000);
+      out.push({ entry: e, ok: !!res.ok, ms: res.ms || null, detail: res.detail || '' });
+    }
+    return out;
+  }
+
+  function relayRows(rows) {
+    return '<table class="tbl"><thead><tr><th>Relay</th><th>Kind</th><th>Result</th></tr></thead><tbody>' +
+      rows.map((r) =>
+        '<tr><td>' + esc(r.entry.comment || O.Servers.hostLabel(r.entry.addr)) + '</td><td>' +
+        (r.entry.orion ? '<span class="pill ok">Orion</span>' : '<span class="pill">public</span>') +
+        '</td><td>' + (r.ok
+          ? '<span class="ok">answered in ' + r.ms + ' ms</span>'
+          : '<span class="bad">' + esc(r.detail || 'no answer') + '</span>') +
+        '</td></tr>').join('') +
+      '</tbody></table>';
+  }
+
+  $('#btn-online-check').addEventListener('click', async function () {
+    const btn = this;
+    btn.disabled = true;
+    btn.textContent = 'Testing…';
+    onlinePill('', 'testing');
+    notice('online-state', '', '<strong>Step 1 of 2.</strong> Asking every relay in your list whether this network can reach it…');
+
+    const rows = await checkRelays(4000);
+    const answered = rows.filter((r) => r.ok);
+    const viaOrion = answered.filter((r) => r.entry.orion);
+    renderRelays();
+
+    if (!answered.length) {
+      onlinePill('bad', 'blocked');
+      notice('online-state', 'bad',
+        '<strong>Step 1 is blocked, so nothing else matters yet.</strong> Not one relay answered — ' +
+        'including Orion\'s own, which runs on the same host you signed in through. ' +
+        'This network is refusing the WebSocket connections shared worlds are built on, ' +
+        'and no TURN server can work around that: the two browsers never get introduced ' +
+        'in the first place.' + relayRows(rows) +
+        '<p>A phone hotspot is the quickest way to prove that is what it is. If you need it to ' +
+        'work on <em>this</em> network, put the relay proxy on a host it does allow — the file ' +
+        'and the three steps are in <code>orion/relay/</code>.</p>');
+      btn.disabled = false;
+      btn.textContent = 'Test again';
+      return;
+    }
+
+    /* Whichever answered first becomes the one a shared world registers with,
+     * so the check leaves the list in a working state rather than just
+     * reporting on it. */
+    if (!R.primary() || !R.primary().lastOk) R.setPrimary(answered[0].entry.id);
+    renderRelays();
+
+    notice('online-state', '',
+      '<strong>Step 1 passed.</strong> ' + answered.length + ' of ' + rows.length + ' relays answered. ' +
+      'Now testing whether a connection can actually be carried through this network…');
+
+    await Tn.refresh();
+    renderTurn();
+    let ice;
+    try {
+      ice = await Vo.checkIce(7000);
+    } catch (e) {
+      ice = { ok: false, error: e.message, kinds: {}, direct: false };
+    }
+
+    const chosen = R.primary();
+    const chosenLine = chosen
+      ? '<p>A world you share will be registered with <strong>' + esc(chosen.comment || chosen.addr) +
+        '</strong>. Anyone joining needs that same relay somewhere in their own list — which it is, ' +
+        'if they are on Orion with the built-in list.</p>'
+      : '';
+
+    if (ice.ok) {
+      onlinePill('ok', 'works');
+      notice('online-state', 'ok',
+        '<strong>Both halves work on this network.</strong> Relays answer, and a relayed ' +
+        'connection is available, so a shared world should connect even though a direct ' +
+        'browser-to-browser link is not allowed here.' + relayRows(rows) + chosenLine +
+        (viaOrion.length && viaOrion.length === answered.length
+          ? '<div class="note warn">Only the Orion relays got through — the public ones are blocked here. ' +
+            'That is fine for joining. Hosting through them drops after about two minutes; see the ' +
+            'note under Relays for the way around it.</div>'
+          : ''));
+    } else if (ice.direct) {
+      onlinePill('warn', 'partly');
+      notice('online-state', 'warn',
+        '<strong>Introductions work; the connection itself might not.</strong> Relays answer, but no ' +
+        'relayed route came back' + (ice.error ? ' (' + esc(ice.error) + ')' : '') + ' — only a direct one. ' +
+        'Shared worlds will work with people this network lets you reach directly and fail with the rest. ' +
+        'Press <strong>Test TURN</strong> below: if that fails too, it is the TURN endpoint rather than ' +
+        'your network.' + relayRows(rows) + chosenLine);
+    } else {
+      onlinePill('bad', 'half blocked');
+      notice('online-state', 'bad',
+        '<strong>Step 1 passed, step 2 did not.</strong> Relays answer, so worlds will appear in the ' +
+        'list — but no connection of any kind could be established from here' +
+        (ice.error ? ' (' + esc(ice.error) + ')' : '') + ', so joining one will hang. This is the half ' +
+        'TURN exists for; check it below.' + relayRows(rows) + chosenLine);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Test again';
   });
 
   /* ============================ the wss helper ============================
@@ -1265,7 +1431,7 @@
    * injected as a <script>, and between "asked the browser for it" and "the
    * browser has it" there is nothing to count. The bar advances a real step per
    * finished stage and shimmers in between, which is the honest shape of it. */
-  const BOOT_STAGES = ['prep', 'turn', 'load', 'start'];
+  const BOOT_STAGES = ['prep', 'theme', 'relay', 'turn', 'load', 'start'];
   let bootAt = 0;
   let bootTimer = null;
   let bootStars = null;
@@ -1365,6 +1531,37 @@
     bootOn(entry ? 'Joining ' + entry.name : 'Starting Minecraft ' + bootVer.label,
            entry ? entry.addr : 'EaglercraftX ' + bootVer.label);
     $('#shell').style.display = 'none';
+
+    /* The menu the client shows is a resource pack, and it has to be written
+     * into the client's storage before the client reads it. Cosmetic, so a
+     * failure here is logged and stepped over rather than stopping a launch. */
+    bootStage('theme');
+    try {
+      const th = await O.AutoTheme.ensure(bootVer.id);
+      if (th.ok && !th.skipped) {
+        console.info('[Orion] menu theme ' + (th.rebuilt ? 'rebuilt' : 'installed') +
+          ' (' + th.files + ' files' + (th.buttons ? ', buttons included' : ', buttons next launch') + ')');
+      } else if (!th.ok && !th.skipped) {
+        console.warn('[Orion] could not build the menu theme: ' + th.reason);
+      }
+      renderThemeState();
+    } catch (e) { /* the game matters more than the menu */ }
+
+    /* The game is handed one primary relay and keeps it. If this network
+     * cannot open that one, no shared world will ever appear — and no TURN
+     * server fixes that, because the two browsers never get introduced in the
+     * first place. So the relay is checked here, and the first one that
+     * answers becomes primary before the opts are built. */
+    bootStage('relay');
+    try {
+      const rr = await R.ensureReachable();
+      if (rr.changed) {
+        console.info('[Orion] switched to the relay that answered: ' + (rr.entry.comment || rr.entry.addr));
+      } else if (!rr.ok) {
+        console.warn('[Orion] no relay answered — shared worlds will not work on this network');
+      }
+      renderRelays();
+    } catch (e) { /* the launch matters more than the check */ }
 
     /* Must happen before the bundle is injected: the wrapper has to be in
      * place on window before the game captures the constructor. A failure here
@@ -1479,6 +1676,7 @@
       return;
     }
 
+    renderThemeState();
     gateOn(true);
     renderGate('Checking your session…', 'ok');
     const res = await Acc.resume();

@@ -9,7 +9,20 @@ palette the launcher uses.
 orion/theme/index.html      palette, wordmark, and a preview of each screen
 orion/theme/js/textures.js  draws every file the pack contains
 orion/theme/js/app.js       the preview, the install, the download
+orion/js/autotheme.js       the same textures, installed by the launcher itself
 ```
+
+**The default menu comes from here.** `orion/js/autotheme.js` calls the same
+drawing code as this page, with the `orion` palette and the wordmark *ORION
+CLIENT*, and writes the pack into the client's storage during the launch — so a
+fresh browser gets an Orion menu without anyone visiting this page. The
+checkbox beside **Launch client** turns that off and removes the pack; this page
+is for building a different one.
+
+It takes two launches to arrive in full. The buttons are painted over the
+client's own `widgets.png`, and that sheet can only be copied while the game is
+running, so the first launch gets everything else and the second picks up the
+buttons.
 
 ## What it replaces
 
@@ -28,7 +41,10 @@ Three of those have layouts or rules that cannot be guessed at:
 **The title** is not one picture. 1.8 draws it from two blits of the same
 sheet — `(0,0,155,44)`, then `(0,45,155,44)` placed beside it — so the wordmark
 is drawn once across a 310-wide strip and cut down the middle, which is the only
-way to get letters that straddle the join.
+way to get letters that straddle the join. Those numbers are texture units of a
+256-wide sheet rather than pixels, so a bigger sheet is sampled in the same
+places and simply arrives sharper: the theme draws at 1024, because at 256 a
+wordmark spanning the screen is eleven pixels tall and looks it.
 
 **The widget sheet** holds far more than buttons. The hotbar sits at
 `(0,0,182,22)`, the selected-slot outline at `(0,22,24,24)`, the three button
@@ -105,22 +121,33 @@ A resource pack can change pictures and sounds, and nothing else. The words on
 the buttons come from the language file; where they sit is compiled into the
 client, which is signed and cannot be edited without breaking that signature.
 
-**The panorama is not drawn as given.** The client does two things to it, both
-established by installing probe packs and looking at the result rather than by
-guessing:
+**The panorama is not drawn as given.** The client lays a white-to-nothing
+gradient over the skybox. That was measured, not guessed: a pack of six pure
+black faces was installed and the rendered menu sampled, on a 1280×800 window.
 
-- It blends the skybox heavily toward white. Six flat `#ff00aa` faces arrive on
-  screen as pale pink; six transparent faces arrive as light grey. So a
-  near-black starfield lands as flat grey and darkening it does not help — the
-  floor is set by the blend. Saturated mid-tones survive, so the sky is drawn as
-  a deep violet that stays violet, and there is no way to get a genuinely dark
-  main menu this way.
-- It blurs it. Single pixels are gone by the time it is on screen, so the nebula
-  is large and soft and the stars are few and fat instead of a thousand specks.
+| where | rendered |
+| --- | --- |
+| y = 80 (behind the title) | rgb 109 |
+| y = 300 | rgb 65 |
+| y = 700 | rgb 9 |
+| y = 760 | rgb 3 |
 
-The main-menu preview copies the wash by eye for that reason: without it you
-would be shown a dark sky the game will never draw. Every other screen in the
-table above is untouched by any of this and comes out exactly as previewed.
+So the top of the menu cannot be darker than about 43% grey however dark the
+texture is, and the bottom two thirds are as dark as you draw them. Blanking
+`gui/title/background/panorama_overlay.png` changes nothing in either
+direction — this build does not draw that texture at all.
+
+Two consequences, both visible in the default theme: the sky is near-black
+because the half of the screen that holds the buttons can be, and the wordmark
+is drawn on a soft dark plate of its own, because the part of the screen it sits
+on cannot be.
+
+The client also blurs the skybox, so single pixels are softened: the nebula is
+large and faint, and the stars are sparse rather than a thousand specks.
+
+The main-menu preview lays the same measured gradient over its own panorama, so
+what it shows is what the game draws. Every other screen in the table above is
+untouched by any of this and comes out exactly as previewed.
 
 Orion's own loading screen — the one before the game appears, with the stages
 and the elapsed time — is part of the launcher, not the client, so it is not in

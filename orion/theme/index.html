@@ -57,8 +57,13 @@
       <div class="form-grid">
         <label class="field">
           <span>Wordmark</span>
-          <input type="text" id="f-word" maxlength="12" value="ORION" placeholder="ORION" autocomplete="off" spellcheck="false">
-          <span class="hint">Up to 12 letters. It replaces the Minecraft logo on the menu.</span>
+          <input type="text" id="f-word" maxlength="14" value="ORION CLIENT" placeholder="ORION CLIENT" autocomplete="off" spellcheck="false">
+          <span class="hint">Up to 14 letters. It replaces the Minecraft logo on the menu.</span>
+        </label>
+        <label class="field">
+          <span>Line underneath</span>
+          <input type="text" id="f-sub" maxlength="40" value="eaglercraft javascript runtime" placeholder="eaglercraft javascript runtime" autocomplete="off" spellcheck="false">
+          <span class="hint">Small type under the wordmark. Leave it empty for none.</span>
         </label>
         <label class="field">
           <span>For which version</span>
@@ -167,6 +172,9 @@
 <script src="../js/widgets.js"></script>
 <script src="../js/account.js"></script>
 <script src="js/textures.js"></script>
+<!-- So this page can take Orion's default menu out of the way when it installs
+     one of its own: two packs touching the same files is a coin toss. -->
+<script src="../js/autotheme.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

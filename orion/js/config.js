@@ -19,6 +19,23 @@ window.ORION.config = {
     pollMs: 5000
   },
 
+  /* Orion's own signalling relay.
+   *
+   * Shared worlds need two different things, and they fail separately: a relay
+   * to introduce the two browsers, and (usually) a TURN server to carry the
+   * traffic afterwards. TURN can do nothing about a blocked relay — if the
+   * network will not let the browser open a WebSocket to relay.deev.is, the
+   * game never gets as far as needing TURN.
+   *
+   * This is a proxy for exactly that case: it forwards bytes, unchanged, to a
+   * real relay, from the same host Orion already uses for accounts. Source and
+   * limits are in orion/relay/. Blank it out to go back to the public relays
+   * alone.
+   */
+  relay: {
+    url: 'https://bgoxonxxutkporbqbtbh.supabase.co/functions/v1/orion-relay'
+  },
+
   /* TURN servers for shared worlds.
    *
    * `credentialsUrl` must return either a bare array of ICE servers or

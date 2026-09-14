@@ -17,7 +17,8 @@
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   let paletteId = 'orion';
-  let word = 'ORION';
+  let word = 'ORION CLIENT';
+  let subtitle = 'eaglercraft javascript runtime';
   let seed = 20260908;
   let doWidgets = true;
   let doText = true;
@@ -36,7 +37,7 @@
     const pal = T.PALETTES[paletteId];
     built = {
       pal: pal,
-      title: T.title(pal, word),
+      title: T.title(pal, word, subtitle),
       mojang: T.mojang(pal, word),
       background: T.background(pal, seed),
       panorama: T.panorama(pal, seed, 256),
@@ -62,24 +63,31 @@
 
     /* The panorama is a turning skybox; face 0 is what you mostly see.
      *
-     * The client then blends it heavily toward white — measured by installing a
-     * pack of flat colours and looking: a #ff00aa face comes out pale pink — so
-     * the preview blends the same way. Without this the preview would show a
-     * deep violet sky the game will never actually draw. The figure is
-     * approximate; everything else on this page is exact. */
+     * The client lays a white-to-nothing gradient over it, and the preview lays
+     * the same one so it shows what the game will actually draw rather than the
+     * texture as authored. The numbers are measured, not guessed: a pack of six
+     * pure black faces renders as rgb 109 at the top of an 800-tall window, 65
+     * a third of the way down, and 9 near the bottom. */
     g.drawImage(b.panorama[0], 0, 0, 256, 256, 0, 0, W, H);
-    g.fillStyle = 'rgba(255,255,255,0.4)';
-    g.fillRect(0, 0, W, H);
-    /* And the menu's own darkening behind the buttons. */
-    g.fillStyle = 'rgba(0,0,0,0.1)';
+    const wash = g.createLinearGradient(0, 0, 0, H);
+    wash.addColorStop(0, 'rgba(255,255,255,0.43)');
+    wash.addColorStop(0.38, 'rgba(255,255,255,0.25)');
+    wash.addColorStop(0.88, 'rgba(255,255,255,0.03)');
+    wash.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = wash;
     g.fillRect(0, 0, W, H);
 
     /* The title, from the two halves the client blits side by side. */
     const scale = W / 427;                       /* 427 ~ a 1280-wide window at GUI scale 3 */
     const tw = 310 * scale, th = 44 * scale;
     const tx = (W - tw) / 2, ty = H * 0.09;
-    g.drawImage(b.title, 0, 0, 155, 44, tx, ty, tw / 2, th);
-    g.drawImage(b.title, 0, 45, 155, 44, tx + tw / 2, ty, tw / 2, th);
+    /* The sheet is drawn larger than 256 so the wordmark is not eleven pixels
+     * tall; the blit is in texture units, so the source rects scale with it. */
+    const S = b.title.width / 256;
+    g.imageSmoothingEnabled = true;
+    g.drawImage(b.title, 0, 0, 155 * S, 44 * S, tx, ty, tw / 2, th);
+    g.drawImage(b.title, 0, 45 * S, 155 * S, 44 * S, tx + tw / 2, ty, tw / 2, th);
+    g.imageSmoothingEnabled = false;
 
     /* Buttons, stretched from the middle of their strip exactly as the game
      * does: left half, right half. */
@@ -213,7 +221,12 @@
   });
 
   $('#f-word').addEventListener('input', function () {
-    word = this.value.toUpperCase().replace(/[^A-Z0-9 .]/g, '').slice(0, 12) || 'ORION';
+    word = this.value.toUpperCase().replace(/[^A-Z0-9 .]/g, '').slice(0, 14) || 'ORION CLIENT';
+    previewAll();
+  });
+
+  $('#f-sub').addEventListener('input', function () {
+    subtitle = this.value.replace(/[^\x20-\x7e]/g, '').slice(0, 40);
     previewAll();
   });
 
@@ -271,11 +284,25 @@
     try {
       const list = await files(version);
       const res = await O.Packs.install({ version: version, title: word + ' Theme', files: list });
+      /* Orion installs a menu theme of its own at launch. Two packs touching
+       * the same files means whichever was selected last wins, which is a
+       * coin toss from here — so installing one from this page takes the
+       * default one out rather than stacking on top of it. */
+      let replacedDefault = false;
+      if (O.AutoTheme && O.AutoTheme.state().installed) {
+        await O.AutoTheme.remove(version);
+        replacedDefault = true;
+      } else if (O.AutoTheme) {
+        O.AutoTheme.setEnabled(false);
+      }
+      const insteadOf = replacedDefault
+        ? ' Orion\u2019s default menu has been switched off, so this is the one you will see.'
+        : '';
       if (res.enabled) {
         notice('#pack-result', 'ok', '<strong>Done — the theme is on.</strong> Installed as <span class="mono">' +
           esc(res.folder) + '</span> (' + res.files + ' files) and selected in the game\u2019s resource packs, ' +
-          'so there is nothing to switch on by hand. <strong>Start the client</strong> — or restart it if it is ' +
-          'already running — and the menus look like this.');
+          'so there is nothing to switch on by hand.' + insteadOf + ' <strong>Start the client</strong> — or restart ' +
+          'it if it is already running — and the menus look like this.');
       } else {
         notice('#pack-result', 'warn', 'Installed as <span class="mono">' + esc(res.folder) + '</span> (' +
           res.files + ' files), but Orion could not switch it on for you' +

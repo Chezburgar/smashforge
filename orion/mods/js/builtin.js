@@ -55,10 +55,11 @@ window.ORION_MODS = window.ORION_MODS || {};
       id: 'menu-theme',
       kind: 'builder',
       title: 'Menu Theme',
-      summary: 'The main menu, the buttons and the loading screen, in the launcher’s colours.',
-      body: 'Pick a palette and it draws the set — a wordmark instead of the Minecraft logo, flat ' +
-            'buttons, a sky, and a loading screen that matches the launcher. Installs straight into ' +
-            'the client with one button.',
+      summary: 'Already on. Open this to change the palette, the wordmark or the line under it.',
+      body: 'Orion writes a menu theme into the client as it launches, so the title screen, the sky, ' +
+            'the loading screen and the buttons are already in its colours. This is where you change ' +
+            'them: pick a palette, set your own wordmark, and install it in place of the default. ' +
+            'Menus only either way — nothing in the world or on the HUD is touched.',
       versions: ['1.8', '1.12.2'],
       href: '../theme/',
       action: 'Open builder',

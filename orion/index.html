@@ -30,6 +30,8 @@
          actually happening. -->
     <ol class="boot-stages" id="boot-stages">
       <li data-stage="prep">Checking your client</li>
+      <li data-stage="theme">Dressing the menu</li>
+      <li data-stage="relay">Finding a relay that answers</li>
       <li data-stage="turn">Preparing connection servers</li>
       <li data-stage="load">Downloading the game</li>
       <li data-stage="start">Starting Minecraft</li>
@@ -128,6 +130,24 @@
           <button class="btn big ghost" id="btn-goto-servers">Manage servers</button>
         </div>
         <div id="bundle-state" style="margin-top:18px"></div>
+        <!-- The menu the client shows is a resource pack Orion writes before
+             it starts. On by default, off in one click, and nothing outside
+             the menus is touched either way. -->
+        <label class="checkline">
+          <input type="checkbox" id="f-menu-theme" checked>
+          <span><strong>Orion menu in game.</strong> The client's title screen, loading
+          screen and buttons, in Orion's colours instead of Minecraft's. Menus only —
+          the hotbar, the lettering and everything in the world are left exactly as the
+          client draws them. <a href="theme/">Build your own →</a></span>
+        </label>
+        <label class="checkline">
+          <input type="checkbox" id="f-menu-font">
+          <span><strong>Smooth lettering too.</strong> Swaps the pixel font for a real
+          typeface — the last thing that still looks like Minecraft once the buttons are
+          flat. <em>This one reaches the game as well as the menus</em>: chat, signs and
+          item names use the same letters.</span>
+        </label>
+        <div id="theme-state" class="muted" style="font-size:13px;margin-top:6px"></div>
       </div>
       <div class="hero-art">
         <img src="assets/orion-logo.svg" alt="">
@@ -329,8 +349,10 @@
           <h4>Click the world when it shows up</h4>
           <p>
             That is the whole thing. If the host chose to hide their world, ask them to
-            show the code instead and use that. If nothing appears, you are probably on
-            different relays — compare the primary below.
+            show the code instead and use that. If nothing appears, press
+            <strong>Test online play</strong> further down this page — either this
+            network is blocking the relays, or the host registered with one that is not
+            in your list.
           </p>
         </li>
       </ol>
@@ -368,14 +390,46 @@
       </div>
     </div>
 
+    <div class="card" id="card-online">
+      <h2>Does online play work here? <span class="pill" id="online-pill">not checked</span></h2>
+      <p>
+        A shared world needs <strong>two different things</strong>, and they fail
+        separately — which is why “it does not work” is usually one specific half
+        being blocked:
+      </p>
+      <table class="tbl">
+        <thead><tr><th>Step</th><th>What it needs</th><th>If it is blocked</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>1. Being introduced</strong></td>
+            <td>A WebSocket to a <strong>relay</strong>, so the two browsers can swap connection details. The client asks every relay in your list.</td>
+            <td>Nothing happens at all. No world ever appears in anyone's list. <strong>TURN cannot help with this</strong> — the game never gets far enough to use it.</td>
+          </tr>
+          <tr>
+            <td><strong>2. The connection itself</strong></td>
+            <td>A direct browser-to-browser link, or a <strong>TURN</strong> server to carry it.</td>
+            <td>The world appears but joining hangs or drops. This is the half TURN fixes.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div id="online-state"></div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-online-check">Test online play</button>
+      </div>
+      <p class="muted">
+        Tests both halves against this network, in order, and tells you which one is
+        the problem. Takes a few seconds.
+      </p>
+    </div>
+
     <div class="card">
       <h2>TURN <span class="pill" id="turn-pill">checking…</span></h2>
       <p>
-        When a shared world will not connect, this is usually why. Two browsers
-        normally talk to each other directly, and plenty of networks — school and
-        office ones especially — do not allow that. A <strong>TURN</strong> server
-        forwards the traffic through a host both sides can reach, which is the only
-        thing that helps once a direct connection is impossible.
+        This is step 2 above. Two browsers normally talk to each other directly, and
+        plenty of networks — school and office ones especially — do not allow that. A
+        <strong>TURN</strong> server forwards the traffic through a host both sides can
+        reach, which is the only thing that helps once a direct connection is
+        impossible. It does nothing for a blocked relay.
       </p>
       <p>
         Orion supplies its own TURN servers, because the ones that came with
@@ -442,8 +496,31 @@
         A relay is only an introduction service: it puts the two browsers in touch,
         then the game data goes directly between you. It never holds your world.
         The <strong>primary</strong> relay is the one a newly shared world registers
-        with — host and joiner should have the same one reachable.
+        with. When you open the Multiplayer screen the client asks <em>every</em>
+        relay in this list who is sharing a world, so a friend finds your world as
+        long as the relay you registered with is somewhere in their list too.
       </p>
+      <div class="note">
+        <strong>The <span class="pill ok">Orion</span> relays are a way in when the
+        public ones are blocked.</strong> They forward every byte unchanged to those
+        same public relays, from the host Orion already uses for accounts — so on a
+        network that blocks <code>relay.deev.is</code> by name but lets you sign in
+        here, they are what gets through, and you still meet everyone who reached that
+        relay the normal way. Orion tests the primary as it launches and moves to one
+        of these if it has to, so you do not have to think about it.
+      </div>
+      <div class="note warn">
+        <strong>Which is why they are not the default.</strong> Orion's relays run on a
+        free Supabase plan, which cuts a connection off after about 150 seconds.
+        <em>Joining</em> a world only needs a few seconds of relay, so joining is
+        unaffected. <em>Hosting</em> holds the connection open the whole time, so a
+        world hosted through an Orion relay stops being listed after a couple of
+        minutes — people already in it stay in, because that traffic goes browser to
+        browser and never touches the relay. To host all evening from a network that
+        blocks the public relays, put the same proxy on a Cloudflare Worker (free, no
+        time limit) and add it below: the file and the three steps are in
+        <code>orion/relay/</code> in the repository.
+      </div>
       <div id="relay-notice"></div>
       <div class="srv-list" id="relay-list"></div>
       <div class="btn-row" style="margin-top:18px">
@@ -846,6 +923,10 @@ play.example.net {
 <script src="js/zip.js"></script>
 <script src="js/packs.js"></script>
 <script src="js/widgets.js"></script>
+<!-- The theme builder's own drawing code, borrowed as-is so the menu the game
+     gets by default and the one theme/ builds are the same textures. -->
+<script src="theme/js/textures.js"></script>
+<script src="js/autotheme.js"></script>
 <script src="js/account.js"></script>
 <script src="js/turn.js"></script>
 <script src="js/voice.js"></script>

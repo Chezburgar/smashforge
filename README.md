@@ -118,11 +118,17 @@ servers. On GitHub Pages it lives at `/orion/`; SMASHFORGE stays at the root.
   the game's music discs, so every jukebox plays yours, and ships the printer
   itself: the jukebox, reskinned and renamed as the Orion Disc Printer. Bring an
   audio file, or have one generated.
-- **A menu theme** — [`orion/theme/`](orion/theme/README.md) restyles the main
-  menu, the buttons, the lettering and the loading screen to match the
-  launcher, and touches nothing in the game while doing it: the buttons share a
-  texture with the hotbar, so Orion borrows that file from the client and
-  paints over only the button strips.
+- **An Orion menu, by default** — the client's title screen, skybox, loading
+  screen and buttons come up in Orion's colours without anyone asking for it:
+  `orion/js/autotheme.js` builds that resource pack and writes it into the
+  client's storage during the launch. Menus only — the buttons share a texture
+  with the hotbar, so Orion copies that file from the running client and paints
+  over only the three button strips, and the lettering is left alone so nothing
+  in the world or on the HUD changes. Two checkboxes beside **Launch client**:
+  one turns the whole thing off, the other swaps the pixel font for a real
+  typeface as well — off by default, because that one does reach chat, signs and
+  item names. [`orion/theme/`](orion/theme/README.md) is the same drawing code with
+  the palette, wordmark and subtitle exposed, for building a different one.
 - **Proximity voice that works** — the client has had it all along and it almost
   never connects, because it ships no connection servers of its own. Orion's
   TURN servers fix that, and the *Together* tab checks your microphone and your
@@ -271,6 +277,45 @@ client is already running appears the next time it launches; Orion says so
 rather than pretending it is instant. 1.12.2's pack storage has not been read
 off a real install, so `packsDB` is null there and it is offered as a download
 instead of an install.
+
+### Online play has two halves, and TURN only fixes one
+
+A shared world needs two separate things, and they fail separately:
+
+1. **Being introduced.** Both browsers open a WebSocket to a **relay** and swap
+   the details they need to reach each other. Without it nothing happens at
+   all — no world ever appears in anyone's Multiplayer list.
+2. **The connection itself.** Once introduced, the browsers talk directly, and a
+   **TURN** server carries that traffic when a direct link is impossible.
+
+TURN cannot do anything about step 1. On a network that blocks the community
+relays — school networks especially — the game never gets as far as needing a
+TURN server, so adding one changes nothing. That is the commonest "online does
+not work", and the usual advice is the wrong fix for it.
+
+Orion therefore ships a relay of its own: `orion/relay/` is a proxy that
+forwards every byte, unread and unchanged, to a real relay, deployed as the
+`orion-relay` Edge Function. It matters only for the address it lives at — the
+same host Orion already uses for accounts — so a network that lets you sign in
+lets it through. It forwards only to the relays in `upstreams.ts`, so it cannot
+be used as an open proxy, and each address pins its upstream (`?to=`) because a
+shared world is registered with one relay and joiners only find it by scanning
+the relays in their own list — so which one a connection lands on has to be
+predictable rather than whichever answered first.
+
+An Edge Function worker is capped at 150s on the free plan, so a world *hosted*
+through it stops being listed after a couple of minutes (people already in it
+stay in — that traffic never touches the relay). *Joining* is a few seconds of
+signalling and is unaffected. `orion/relay/cloudflare-worker.js` is the same
+pipe for Cloudflare Workers, which have no such cap; the three steps to put it
+up are in `orion/relay/README.md`.
+
+Two client-side pieces go with it. `orion/js/relays.js` seeds the Orion relays
+ahead of the public ones and, just before a launch, pings the primary and moves
+to the first relay that answers — the game is handed one relay and keeps it, so
+handing it a dead one is the difference between "no worlds ever appear" and
+everything working. And the *Shared worlds* tab has **Test online play**, which
+tests the two steps in order and names the one that is broken.
 
 ### TURN for shared worlds — and for voice
 
