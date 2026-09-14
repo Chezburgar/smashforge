@@ -16,6 +16,32 @@ commonest failure.
 
 This directory is the fix for step 1.
 
+## The bug this had, and how it hid
+
+The first version accepted the browser's socket immediately and connected onward
+afterwards. When the onward connection failed the browser was left holding a
+socket that had opened and would never say anything — which is indistinguishable,
+from the near end, from a relay that answered. Everything that tested it agreed
+it was working, Orion's own launcher included, and the game then sat on a
+Multiplayer screen with nothing in it.
+
+Two things came out of that:
+
+- **The upstream is connected before the browser is accepted.** A relay that is
+  down is now a refused connection, which is the truth and which every check can
+  see.
+- **`?probe=1`** answers the same question over plain HTTPS: it opens a socket to
+  the relay, waits for it, closes it and reports. The launcher asks that instead
+  of opening a socket to the proxy, so a green tick means the whole path.
+
+Both were checked against the live deployment rather than reasoned about. Asked
+from outside, `relay.deev.is` and `relay.shhnowisnottheti.me` answer in 140–370 ms;
+**`relay.lax1dude.net` refuses the connection** and is no longer in Orion's seeded
+list. Driving the proxy with a browser-shaped client through its public address:
+a byte sent to a working relay comes back as that relay closing the connection —
+so frames cross both ways — while the same connection through the dead relay now
+fails to open at all instead of opening and going quiet.
+
 ## What it is
 
 A proxy that speaks WebSocket to the browser and forwards every byte, unread

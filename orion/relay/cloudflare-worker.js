@@ -57,24 +57,54 @@ export default {
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
-    if ((request.headers.get('Upgrade') || '').toLowerCase() !== 'websocket') {
-      /* Lets the launcher check this is alive without opening a socket. */
+    const picked = resolveUpstream(url.searchParams.get('to'));
+    const wantsSocket = (request.headers.get('Upgrade') || '').toLowerCase() === 'websocket';
+
+    /* The health check the launcher asks: does the relay behind this proxy
+     * answer? Opening a socket to the proxy only ever proves the proxy is
+     * there, which is not the same question and was the bug in the first
+     * version of the Supabase one. */
+    if (!wantsSocket && url.searchParams.has('probe')) {
+      if (!picked.ok) {
+        return new Response(JSON.stringify({ ok: false, error: picked.error }), {
+          status: 403, headers: { ...CORS, 'Content-Type': 'application/json' }
+        });
+      }
+      try {
+        const res = await fetch(picked.url, { headers: { Upgrade: 'websocket' } });
+        if (!res.webSocket) throw new Error('no socket');
+        res.webSocket.accept();
+        res.webSocket.close(1000, 'probe');
+        return new Response(JSON.stringify({ ok: true, upstream: picked.host }), {
+          status: 200, headers: { ...CORS, 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        return new Response(JSON.stringify({
+          ok: false, upstream: picked.host,
+          error: picked.host + ' could not be reached: the connection was refused'
+        }), { status: 502, headers: { ...CORS, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    if (!wantsSocket) {
       return new Response(JSON.stringify({
         ok: true,
         service: 'orion-relay',
         forwardsTo: ALLOWED,
         defaultUpstream: DEFAULT_UPSTREAM,
-        note: 'connect with a WebSocket, optionally ?to=<relay hostname>'
+        note: 'connect with a WebSocket, optionally ?to=<relay hostname>; ?probe=1 is a health check'
       }), { status: 200, headers: { ...CORS, 'Content-Type': 'application/json' } });
     }
 
-    const picked = resolveUpstream(url.searchParams.get('to'));
     if (!picked.ok) {
       return new Response(JSON.stringify({ ok: false, error: picked.error }), {
         status: 403, headers: { ...CORS, 'Content-Type': 'application/json' }
       });
     }
 
+    /* Upstream first, and a failure here is a refused connection rather than a
+     * socket that opens and then says nothing for ever. A browser that gets a
+     * 101 out of this has a relay on the far side of it. */
     let upstream;
     try {
       const res = await fetch(picked.url, { headers: { Upgrade: 'websocket' } });

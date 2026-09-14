@@ -295,6 +295,17 @@ shared world is registered with one relay and joiners only find it by scanning
 the relays in their own list — so which one a connection lands on has to be
 predictable rather than whichever answered first.
 
+The first version of that proxy had a bug worth recording, because of how it
+hid: it accepted the browser's socket immediately and connected onward
+afterwards, so when the relay behind it was down the game held a socket that had
+opened and would never speak. Every check agreed it was working — the launcher's
+included — and the Multiplayer screen simply stayed empty. It now connects
+upstream *before* accepting the browser, so a dead relay is a refused connection,
+and it answers `?probe=1` over plain HTTPS with a verdict on the relay itself,
+which is what the launcher asks. Measured from outside: `relay.deev.is` and
+`relay.shhnowisnottheti.me` answer in 140–370 ms, `relay.lax1dude.net` refuses —
+so that one is no longer seeded.
+
 An Edge Function worker is capped at 150s on the free plan, so a world *hosted*
 through it stops being listed after a couple of minutes (people already in it
 stay in — that traffic never touches the relay). *Joining* is a few seconds of

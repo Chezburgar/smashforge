@@ -15,17 +15,24 @@ window.ORION = window.ORION || {};
 (function (O) {
   'use strict';
 
-  const KEY = 'orion.relays.v2';
-  const OLD_KEY = 'orion.relays.v1';
+  const KEY = 'orion.relays.v3';
+  /* Older books are read once and rebuilt: v2's list pointed a relay at a host
+   * that has since gone down, and nobody should have to fix that by hand. */
+  const OLD_KEYS = ['orion.relays.v2', 'orion.relays.v1'];
   const R = {};
   O.Relays = R;
 
   /* The public relays shipped with EaglercraftX, run by the Eaglercraft
-   * community rather than by Orion. */
+   * community rather than by Orion.
+   *
+   * relay.lax1dude.net is not in this list any more: asked from outside this
+   * browser — from the proxy, which has nothing between it and the open
+   * internet — it refuses the connection outright. A relay that is down is not
+   * a fallback, it is a dead end that takes a turn in the rotation, so it is
+   * gone until it comes back. Anyone who wants it can add it by hand. */
   const PUBLIC = [
-    { addr: 'wss://relay.deev.is/', comment: 'lax1dude relay #1' },
-    { addr: 'wss://relay.lax1dude.net/', comment: 'lax1dude relay #2' },
-    { addr: 'wss://relay.shhnowisnottheti.me/', comment: 'ayunami relay #1' }
+    { addr: 'wss://relay.deev.is/', comment: 'lax1dude relay' },
+    { addr: 'wss://relay.shhnowisnottheti.me/', comment: 'ayunami relay' }
   ];
 
   /* Orion's own front door to those same relays. It forwards every byte
@@ -51,7 +58,7 @@ window.ORION = window.ORION || {};
       }
       return { addr: addr, comment: label, orion: true };
     };
-    return [at('relay.deev.is', 'Orion relay'), at('relay.lax1dude.net', 'Orion relay (backup)')]
+    return [at('relay.deev.is', 'Orion relay'), at('relay.shhnowisnottheti.me', 'Orion relay (backup)')]
       .filter(Boolean);
   }
 
@@ -85,13 +92,14 @@ window.ORION = window.ORION || {};
    * ones. Rather than throw that away, keep anything the person added
    * themselves and rebuild the built-in half around it. */
   function migrate() {
-    let old;
-    try {
-      old = JSON.parse(localStorage.getItem(OLD_KEY) || 'null');
-    } catch (e) {
-      return null;
+    let old = null;
+    for (const key of OLD_KEYS) {
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+        if (Array.isArray(parsed) && parsed.length) { old = parsed; break; }
+      } catch (e) { /* try the next one */ }
     }
-    if (!Array.isArray(old) || !old.length) return null;
+    if (!old) return null;
     const mine = old
       .filter((e) => e && typeof e.addr === 'string' && !e.builtin)
       .map((e) => ({
@@ -177,10 +185,55 @@ window.ORION = window.ORION || {};
     return list;
   };
 
+  /* Asking one of Orion's own relays whether it works, properly.
+   *
+   * Opening a socket to the proxy proves only that the proxy answered. It says
+   * nothing about the relay on the far side of it, and that gap told a lie
+   * once already: the first version of the proxy accepted the browser before it
+   * had connected onward, so a relay that was down still tested green here and
+   * then did nothing in the game. The proxy now refuses rather than accepting a
+   * connection it cannot forward, and it answers ?probe=1 over plain HTTPS with
+   * a verdict on the relay itself — which is what this asks for, so that a
+   * green tick means the whole path.
+   *
+   * Only for Orion's own entries: a public relay has no such endpoint, and
+   * opening a socket to it is already the whole path. */
+  async function probeOrion(addr, timeoutMs) {
+    /* The proxy gives the relay eight seconds to answer, so asking it for a
+     * verdict in less than that is asking it to guess. */
+    const budget = Math.max(timeoutMs || 0, 6000);
+    const started = performance.now();
+    const url = addr.replace(/^ws/i, 'http');
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    const timer = setTimeout(() => ctl && ctl.abort(), budget);
+    try {
+      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'probe=1', {
+        cache: 'no-store',
+        signal: ctl ? ctl.signal : undefined
+      });
+      const body = await res.json().catch(() => ({}));
+      clearTimeout(timer);
+      if (res.ok && body.ok) {
+        return { ok: true, code: 'open', ms: Math.round(performance.now() - started), via: body.upstream || null };
+      }
+      return {
+        ok: false,
+        code: 'upstream',
+        detail: body.error || 'The relay behind Orion\u2019s proxy did not answer.',
+        via: body.upstream || null
+      };
+    } catch (e) {
+      clearTimeout(timer);
+      return { ok: false, code: 'unreachable', detail: 'Orion\u2019s relay could not be reached from this network.' };
+    }
+  }
+
   R.probe = async function (id, timeoutMs) {
     const e = R.get(id);
     if (!e) return { ok: false, error: 'gone' };
-    const res = await O.Servers.ping(e.addr, timeoutMs || 7000);
+    const res = e.orion
+      ? await probeOrion(e.addr, timeoutMs || 9000)
+      : await O.Servers.ping(e.addr, timeoutMs || 7000);
     e.lastOk = res.ok;
     e.lastMs = res.ok ? res.ms : null;
     save();
@@ -210,9 +263,11 @@ window.ORION = window.ORION || {};
     const tried = [];
     for (const e of order) {
       if (tried.length && Date.now() > deadline) break;
-      const res = await O.Servers.ping(e.addr, budget);
-      e.lastOk = res.ok;
-      e.lastMs = res.ok ? res.ms : null;
+      /* Through R.probe, so one of Orion's own relays is judged on whether the
+       * relay behind it answered rather than on whether the proxy did. Handing
+       * the game a proxy with nothing on the far side of it is the exact
+       * failure this whole function exists to prevent. */
+      const res = await R.probe(e.id, budget);
       tried.push({ id: e.id, comment: e.comment || e.addr, ok: res.ok, ms: res.ms || null });
       if (res.ok) {
         const changed = e.id !== first.id;

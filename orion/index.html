@@ -631,6 +631,14 @@
         relay the normal way. Orion tests the primary as it launches and moves to one
         of these if it has to, so you do not have to think about it.
       </div>
+      <div class="note">
+        <strong>Testing one of these asks about the whole path.</strong> Opening a
+        socket to a proxy only ever proves the proxy is there — an earlier version of
+        Orion's answered before it knew whether it could reach a relay, so a relay that
+        was down still came up green here and then did nothing in the game. It now
+        refuses a connection it cannot forward, and <strong>Test</strong> asks it
+        directly whether the relay behind it is answering.
+      </div>
       <div class="note warn">
         <strong>Which is why they are not the default.</strong> Orion's relays run on a
         free Supabase plan, which cuts a connection off after about 150 seconds.
